@@ -282,7 +282,9 @@ class MainWindow(QMainWindow):
             f"background:{color}; color:#111; border-radius:8px; padding:18px;"
             "font-size:24px; font-weight:bold;"
         )
-        self.score_label.setText(f"综合得分 {verdict.score:.1f} / 100")
+        self.score_label.setText(
+            f"综合得分 {verdict.score:.1f} / 100（仅供参考）\n处置：{verdict.action}"
+        )
         self.reason_label.setText("\n".join(f"· {r}" for r in verdict.reasons))
 
         self.table.setRowCount(len(verdict.defects))

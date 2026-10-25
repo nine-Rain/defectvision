@@ -1,40 +1,77 @@
-# 缺陷等级判定规则。
+# 缺陷等级判定规则
 #
-# 这一层不训练模型，是纯规则：把检测结果量化成可解释的特征，再映射到 I~IV 级。
-# 论文里可以直接引用这张表，产线上也能由工艺人员自己调阈值，不用重训模型。
+# 严格对齐开题报告（2026-09-23）"缺陷等级判定方法研究"一节的定义：
+#
+#   I 级（轻微）：面积占比 ≤0.5%、数量 ≤2 且不含裂纹类缺陷 —— 合格，放行留档
+#   II 级（中度）：面积 0.5%~2%，或数量 3~5，或存在非贯穿性短裂纹 —— 让步接收，返修后复检
+#   III 级（严重）：面积 2%~5%，或数量 6~10，或裂纹长度超过限值 —— 不合格，返工并二次全检
+#   IV 级（致命）：面积 >5%，或缺陷连片密集，或存在贯穿性裂纹 —— 判废，追溯同批次
+#
+# 判定原则：**就高不就低**。面积、数量、裂纹、连片四个判据各自给出等级，取最高者。
+# 这样任何单一指标恶化都不会被其他指标"平均掉"，也便于向工艺人员解释。
+#
+# 说明：公开数据集里没有"裂纹"这个类别，用下面的 crack.classes 做映射。
+# MSDD 只有划痕（scratch），NEU-DET 有龟裂（crazing）。换数据集时改这里即可。
 
-# 缺陷类型的严重度（1=轻微，4=致命）。工艺上认为折叠/氧化直接报废，划痕可返修。
+levels:
+  1:
+    name: "I级 轻微"
+    action: "合格，放行并留档备查"
+  2:
+    name: "II级 中度"
+    action: "让步接收，打磨/补焊等简单返修后复检"
+  3:
+    name: "III级 严重"
+    action: "不合格，返工处理并二次全检"
+  4:
+    name: "IV级 致命"
+    action: "判废，追溯同批次产品与相关工序"
+
+criteria:
+  # 缺陷覆盖面积占比（按检测框的并集计算，避免重叠框重复计数）
+  area_ratio:
+    level2: 0.005    # >0.5%  判 II
+    level3: 0.020    # >2%    判 III
+    level4: 0.050    # >5%    判 IV
+
+  # 缺陷数量
+  count:
+    level2: 3        # >=3  判 II
+    level3: 6        # >=6  判 III
+    level4: 11       # >=11 判 IV（即"超过 10 处"）
+
+  # 裂纹类缺陷：长度按外接框长边 / 图像长边归一化
+  # （不用对角线：轴对齐框的边长最多只到 0.707 倍对角线，阈值 0.8 会永远触发不了）
+  crack:
+    classes: ["crazing", "crack", "scratch"]   # 视为裂纹/线状缺陷的类别名
+    length_level3_ratio: 0.30   # 超过图像长边的 30% -> III
+    length_level4_ratio: 0.80   # 超过 80% -> 视为贯穿性 -> IV
+    short_level2: true          # 存在裂纹但未超限 -> 至少 II
+
+  # 连片密集：缺陷多且彼此靠得很近
+  clustered:
+    min_count: 4
+    max_gap_ratio: 0.02         # 最近间距 < 2% 对角线即视为相邻
+
+# 综合得分仅作展示，不参与定级（定级只看上面的判据）。
+# 归一化上限用于把各特征压到 0~1。
+score:
+  weights:
+    area: 0.40
+    count: 0.25
+    severity: 0.25
+    spread: 0.10
+  normalizers:
+    area_ratio: 0.05
+    count: 10
+    spread: 0.50
+
+# 缺陷类型严重度，仅用于综合得分展示与"最严重缺陷"的说明
 class_severity:
   stain: 1
   scratch: 2
   dark_spot: 2
   porosity: 3
   oxidation: 3
+  crazing: 3
   fold: 4
-
-# 四个特征的归一化上限：达到这个值就记满分
-normalizers:
-  area_ratio: 0.10     # 缺陷总面积占整图 10% 记满分
-  count: 10            # 10 个缺陷记满分
-  spread: 0.50         # 缺陷外接框覆盖半张图记满分
-
-# 特征权重，和为 1
-weights:
-  area: 0.40
-  count: 0.25
-  severity: 0.25
-  spread: 0.10
-
-# 综合得分 -> 等级（左闭右开）
-levels:
-  - {level: 1, name: "I级 轻微", upper: 25}
-  - {level: 2, name: "II级 中度", upper: 50}
-  - {level: 3, name: "III级 严重", upper: 75}
-  - {level: 4, name: "IV级 致命", upper: 101}
-
-# 一票否决规则：只要有严重度 >= 这个值且面积占比超过 min_area 的缺陷，
-# 最终等级不得低于 forced_level。
-veto:
-  severity_gte: 4
-  min_area_ratio: 0.005
-  forced_level: 3
