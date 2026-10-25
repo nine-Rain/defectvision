@@ -15,11 +15,10 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
-import traceback
 from pathlib import Path
 
 import numpy as np
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
@@ -43,39 +42,8 @@ from PyQt5.QtWidgets import (
 from src.config import repo_path
 from src.detectors import DetectionResult, load_detector
 from src.grade import GradeResult, format_report, grade
-
-CLASS_COLORS = [
-    "#ffd60a", "#ff3b30", "#30d158", "#0a84ff", "#ff5c8d", "#bf5af2",
-    "#64d2ff", "#ff9f0a", "#5e5ce6", "#ac8e68",
-]
-LEVEL_STYLE = {
-    0: ("#30d158", "合格"),
-    1: ("#30d158", "I级 轻微"),
-    2: ("#ffd60a", "II级 中度"),
-    3: ("#ff9f0a", "III级 严重"),
-    4: ("#ff3b30", "IV级 致命"),
-}
-
-
-class InferenceWorker(QThread):
-    """在后台线程里跑推理，避免界面假死。"""
-
-    finished = pyqtSignal(object, object)
-    failed = pyqtSignal(str)
-
-    def __init__(self, detector, image, conf: float) -> None:
-        super().__init__()
-        self.detector = detector
-        self.image = image
-        self.conf = conf
-
-    def run(self) -> None:  # noqa: D102
-        try:
-            result: DetectionResult = self.detector.predict(self.image, conf=self.conf)
-            verdict = grade(result.detections, result.image_size)
-            self.finished.emit(result, verdict)
-        except Exception:  # noqa: BLE001 - 界面要显示错误而不是崩掉
-            self.failed.emit(traceback.format_exc())
+from src.ui.theme import CLASS_COLORS, badge_style, style_for
+from src.ui.worker import InferenceWorker
 
 
 class MainWindow(QMainWindow):
@@ -93,6 +61,7 @@ class MainWindow(QMainWindow):
         self.last_result: DetectionResult | None = None
         self.last_verdict: GradeResult | None = None
         self.worker: InferenceWorker | None = None
+        self._compare_window = None
 
         self._build_ui(conf)
 
@@ -111,10 +80,14 @@ class MainWindow(QMainWindow):
         self.export_button = QPushButton("导出报告")
         self.export_button.clicked.connect(self.export_report)
         self.export_button.setEnabled(False)
+        self.compare_button = QPushButton("模型对比")
+        self.compare_button.setToolTip("同一张图，用 YOLO 和自研 CNN 各判一次，看等级差异")
+        self.compare_button.clicked.connect(self.open_compare)
 
         toolbar.addWidget(self.open_button)
         toolbar.addWidget(self.batch_button)
         toolbar.addWidget(self.detect_button)
+        toolbar.addWidget(self.compare_button)
         toolbar.addStretch(1)
         toolbar.addWidget(QLabel("置信度阈值"))
         self.conf_slider = QSlider(Qt.Horizontal)
@@ -150,17 +123,26 @@ class MainWindow(QMainWindow):
         self.level_label = QLabel("—")
         self.level_label.setAlignment(Qt.AlignCenter)
         self.level_label.setStyleSheet(
-            "background:#333; color:#fff; border-radius:8px; padding:18px; font-size:24px; font-weight:bold;"
+            "background:#333; color:#fff; border-radius:8px; padding:14px; font-size:24px; font-weight:bold;"
         )
         layout.addWidget(self.level_label)
 
+        # 产线最关心的只有一件事：放行还是拦下来。所以处置意见紧跟徽章、单独高亮，
+        # 而不是缩在得分下面当小字。
+        self.action_label = QLabel("处置：—")
+        self.action_label.setAlignment(Qt.AlignCenter)
+        self.action_label.setWordWrap(True)
+        self.action_label.setMinimumHeight(34)
+        self.action_label.setStyleSheet(
+            "background:#1e1e1e; color:#e5e5e5; border-radius:6px; padding:8px; font-size:13px;"
+        )
+        layout.addWidget(self.action_label)
+
         self.score_label = QLabel("综合得分 —")
         self.score_label.setAlignment(Qt.AlignCenter)
-        self.score_label.setWordWrap(True)
-        self.score_label.setMinimumHeight(46)
-        self.score_label.setStyleSheet("font-size:13px; color:#aaa;")
+        self.score_label.setStyleSheet("font-size:11px; color:#777;")
         layout.addWidget(self.score_label)
-        layout.addSpacing(8)
+        layout.addSpacing(6)
 
         group = QGroupBox("缺陷清单")
         group_layout = QVBoxLayout(group)
@@ -190,6 +172,16 @@ class MainWindow(QMainWindow):
         )
         if path:
             self.load_image(Path(path))
+
+    def open_compare(self) -> None:
+        """打开双模型对比窗口，默认拿当前权重和自研 CNN 对比。"""
+        from src.ui.compare import CompareWindow
+
+        window = CompareWindow(self.weights, "runs/cnn-cbam/best.pt", self.conf_slider.value() / 100)
+        if self.image_path is not None:
+            window.load_image(self.image_path)
+        window.show()
+        self._compare_window = window  # 持有引用，否则窗口会被回收
 
     def load_image(self, path: Path) -> None:
         from PIL import Image
@@ -279,15 +271,11 @@ class MainWindow(QMainWindow):
         self._apply_pixmap()
 
     def update_panel(self, result: DetectionResult, verdict: GradeResult) -> None:
-        color, text = LEVEL_STYLE.get(verdict.level, ("#888", verdict.level_name))
+        _, text = style_for(verdict.level)
         self.level_label.setText(text)
-        self.level_label.setStyleSheet(
-            f"background:{color}; color:#111; border-radius:8px; padding:18px;"
-            "font-size:24px; font-weight:bold;"
-        )
-        self.score_label.setText(
-            f"综合得分 {verdict.score:.1f} / 100（仅供参考）\n处置：{verdict.action}"
-        )
+        self.level_label.setStyleSheet(badge_style(verdict.level))
+        self.action_label.setText(f"处置：{verdict.action}")
+        self.score_label.setText(f"综合得分 {verdict.score:.1f} / 100（仅供参考，不参与定级）")
         self.reason_label.setText("\n".join(f"· {r}" for r in verdict.reasons))
 
         self.table.setRowCount(len(verdict.defects))
@@ -373,11 +361,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m src.ui", description="桌面端缺陷检测系统")
     parser.add_argument("--weights", default="runs/baseline/weights/best.pt")
     parser.add_argument("--conf", type=float, default=0.25)
+    parser.add_argument("--image", help="启动时自动载入一张图，演示用")
     args = parser.parse_args(argv)
 
     app = QApplication(sys.argv[:1])
     window = MainWindow(args.weights, args.conf)
     window.show()
+    if args.image:
+        path = Path(args.image)
+        if path.exists():
+            window.load_image(path)
+        else:
+            print(f"找不到图片: {path}", file=sys.stderr)
     return app.exec_()
 
 

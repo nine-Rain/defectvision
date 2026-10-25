@@ -113,7 +113,9 @@ class TorchvisionDetector(BaseDetector):
         import torch
 
         start = time.perf_counter()
-        tensor = torch.from_numpy(np.ascontiguousarray(image)).permute(2, 0, 1).float() / 255.0
+        # 先转 float 再交给 torch：uint8 -> float32 会产生新数组，避免 torch 对只读数组报警告
+        array = np.asarray(image, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(np.ascontiguousarray(array)).permute(2, 0, 1)
         with torch.inference_mode():
             output = self.model([tensor.to(self.device)])[0]
         latency = (time.perf_counter() - start) * 1000
