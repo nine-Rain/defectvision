@@ -1,0 +1,52 @@
+# 由 src/calibrate_grading.py 在 val 上拟合、test 上验证
+levels:
+  1:
+    name: I级 轻微
+    action: 合格，放行并留档备查
+  2:
+    name: II级 中度
+    action: 让步接收，打磨/补焊等简单返修后复检
+  3:
+    name: III级 严重
+    action: 不合格，返工处理并二次全检
+  4:
+    name: IV级 致命
+    action: 判废，追溯同批次产品与相关工序
+criteria:
+  area_ratio:
+    level2: 0.005
+    level3: 0.015
+    level4: 0.04
+  count:
+    level2: 3
+    level3: 5
+    level4: 9
+  crack:
+    classes:
+    - crazing
+    - crack
+    - scratch
+    length_level3_ratio: 0.3
+    length_level4_ratio: 0.8
+    short_level2: true
+  clustered:
+    min_count: 4
+    max_gap_ratio: 0.02
+score:
+  weights:
+    area: 0.4
+    count: 0.25
+    severity: 0.25
+    spread: 0.1
+  normalizers:
+    area_ratio: 0.05
+    count: 10
+    spread: 0.5
+class_severity:
+  stain: 1
+  scratch: 2
+  dark_spot: 2
+  porosity: 3
+  oxidation: 3
+  crazing: 3
+  fold: 4

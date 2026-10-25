@@ -1,0 +1,15 @@
+{
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\yolo11n-640\\weights\\best.pt",
+  "backend": "pt",
+  "imgsz": 640,
+  "runs": 50,
+  "size_mb": 5.26,
+  "params": 2606098,
+  "mean_ms": 15.06,
+  "p50_ms": 14.53,
+  "p95_ms": 20.14,
+  "min_ms": 12.12,
+  "max_ms": 20.81,
+  "fps": 66.4,
+  "device": "0"
+}
