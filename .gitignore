@@ -41,8 +41,13 @@ results/*
 !results/*.json
 
 # --- Demo 上传的临时文件 ---
+# Gradio 默认把用户上传的图缓存到 gradio/，曾经把一张私人截图带进过仓库
+gradio/
 gradio_cached_examples/
 flagged/
+
+# Ultralytics 运行时生成的本地配置（含本机路径，不该进仓库）
+Ultralytics/
 
 # --- 编辑器 / 系统 ---
 .vscode/
@@ -50,6 +55,3 @@ flagged/
 .DS_Store
 Thumbs.db
 *.log
-
-# Ultralytics ����ʱ���ɵı������ã�������·�������ý��ֿ⣩
-Ultralytics/

@@ -9,11 +9,16 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
 
 from src.config import repo_path
+
+# Gradio 默认把上传的图片缓存在当前目录的 gradio/ 下，一不小心就被 git add 进仓库了。
+# 这里统一挪到 runs/ 里（已在 .gitignore 中）。必须在 import gradio 之前设置。
+os.environ.setdefault("GRADIO_TEMP_DIR", str(repo_path("runs") / "gradio_cache"))
 
 
 def build_demo(weights: Path, default_conf: float = 0.25):
