@@ -22,7 +22,6 @@ from pathlib import Path
 import numpy as np
 
 from src.config import load_dataset, repo_path
-from src.data.yolo_dataset import read_yolo_labels
 from src.detectors import Detection, load_detector
 from src.grade import grade, load_grading_config
 
@@ -31,20 +30,61 @@ LEVELS = [0, 1, 2, 3, 4]
 LEVEL_LABELS = {0: "合格", 1: "I", 2: "II", 3: "III", 4: "IV"}
 
 
-def reference_grade(image_path: Path, label_path: Path, image_size, grading_cfg) -> int:
-    """用标注框算"参考等级"。标签里的类别从 0 开始，和模型输出一致。"""
-    width, height = image_size
-    boxes, labels = read_yolo_labels(label_path, width, height)
-    names: dict[int, str] = grading_cfg["names_lookup"]
-    detections = [
-        Detection(
-            cls_id=int(label) - 1,  # 数据集里 +1 过，这里还原
-            cls_name=names.get(int(label) - 1, str(int(label) - 1)),
-            confidence=1.0,
-            box=tuple(float(v) for v in box),
+def label_to_detections(
+    label_path: Path, width: int, height: int, names: dict[int, str], with_mask: bool = True
+) -> list[Detection]:
+    """把标注转成 Detection。with_mask=True 时多边形会栅格化成掩码。
+
+    **口径必须和被测模型一致**：框模型（YOLO 检测）就用框算面积，
+    掩码模型（YOLO-seg）就用掩码算。混着比会引入系统性偏差。
+    """
+    detections: list[Detection] = []
+    if not label_path.exists():
+        return detections
+
+    for line in label_path.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        cls = int(parts[0])
+        coords = [float(v) for v in parts[1:]]
+        mask = None
+        if with_mask and len(coords) > 4:  # 多边形：还原成二值掩码
+            from PIL import Image, ImageDraw
+
+            canvas = Image.new("L", (width, height), 0)
+            points = [
+                (coords[i] * width, coords[i + 1] * height) for i in range(0, len(coords) - 1, 2)
+            ]
+            ImageDraw.Draw(canvas).polygon(points, fill=1)
+            mask = np.asarray(canvas, dtype=bool)
+
+        xs, ys = coords[0::2], coords[1::2]
+        box = (
+            max(0.0, min(xs) * width),
+            max(0.0, min(ys) * height),
+            min(float(width), max(xs) * width),
+            min(float(height), max(ys) * height),
         )
-        for box, label in zip(boxes, labels, strict=True)
-    ]
+        detections.append(
+            Detection(
+                cls_id=cls,
+                cls_name=names.get(cls, str(cls)),
+                confidence=1.0,
+                box=box,
+                mask=mask,
+            )
+        )
+    return detections
+
+
+def reference_grade(
+    image_path: Path, label_path: Path, image_size, grading_cfg, with_mask: bool
+) -> int:
+    """用标注算"参考等级"，判据口径与模型输出一致。"""
+    width, height = image_size
+    names: dict[int, str] = grading_cfg["names_lookup"]
+    detections = label_to_detections(label_path, width, height, names, with_mask=with_mask)
     return grade(detections, image_size, grading_cfg["config"]).level
 
 
@@ -64,22 +104,31 @@ def main(argv: list[str] | None = None) -> int:
     names = dataset_cfg["names"]
     payload = {"config": grading_cfg, "names_lookup": names}
 
-    detector = load_detector(args.weights)
-
+    # 先探一下模型输出有没有掩码，决定参考等级的算法口径（必须一致）
     from PIL import Image
 
     image_dir = root / "images" / args.split
     label_dir = root / "labels" / args.split
-    images = sorted(p for p in image_dir.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"})
+    images = sorted(
+        p for p in image_dir.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
+    )
     if not images:
         raise SystemExit(f"{image_dir} 下没有图片")
+
+    detector = load_detector(args.weights)
+    probe_image = np.asarray(Image.open(images[0]).convert("RGB"))
+    probe = detector.predict(probe_image, conf=args.conf)
+    with_mask = any(d.mask is not None for d in probe.detections)
+    print(f"口径: {'掩码面积' if with_mask else '框面积'}（与模型输出一致）")
 
     confusion = np.zeros((5, 5), dtype=int)  # 行=参考等级, 列=系统等级
     rows = []
     for path in images:
         image = np.asarray(Image.open(path).convert("RGB"))
         height, width = image.shape[:2]
-        truth = reference_grade(path, label_dir / f"{path.stem}.txt", (width, height), payload)
+        truth = reference_grade(
+            path, label_dir / f"{path.stem}.txt", (width, height), payload, with_mask
+        )
         result = detector.predict(image, conf=args.conf)
         predicted = grade(result.detections, result.image_size).level
         confusion[truth, predicted] += 1

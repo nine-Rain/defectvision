@@ -80,6 +80,29 @@ def _union_area_ratio(boxes: list[tuple[float, float, float, float]], width: int
     return float(mask.mean())
 
 
+def _mask_area_ratio(detections: list[Detection], width: int, height: int) -> float | None:
+    """有掩码时按像素算真实覆盖面积——框会把"缺陷+大片背景"一起算进去，
+    分割掩码不会，这是降低面积虚高的关键。"""
+    masks: list[np.ndarray] = []
+    for detection in detections:
+        if detection.mask is None:
+            return None  # 混着来就没法统一口径，退回框面积
+        mask = np.asarray(detection.mask)
+        if mask.shape != (height, width):
+            from PIL import Image
+
+            mask = np.asarray(
+                Image.fromarray(mask.astype(np.uint8)).resize((width, height), Image.NEAREST)
+            )
+        masks.append(mask.astype(bool))
+    if not masks:
+        return None
+    union = np.zeros((height, width), dtype=bool)
+    for mask in masks:
+        union |= mask
+    return float(union.mean())
+
+
 def _box_gap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
     dx = max(0.0, max(a[0], b[0]) - min(a[2], b[2]))
     dy = max(0.0, max(a[1], b[1]) - min(a[3], b[3]))
@@ -138,7 +161,10 @@ def grade(
 
     # ---------- 特征量化 ----------
     boxes = [d.box for d in kept]
-    area_ratio = _union_area_ratio(boxes, width, height)
+    # 有掩码就用掩码面积（更接近真实缺陷面积），否则退回框并集。
+    # 这一步直接决定"面积判据"是否虚高——框会把背景一起算进去。
+    mask_ratio = _mask_area_ratio(kept, width, height)
+    area_ratio = mask_ratio if mask_ratio is not None else _union_area_ratio(boxes, width, height)
     count = len(kept)
     severity_max = max(severity_map.get(d.cls_name, 2) for d in kept)
 
