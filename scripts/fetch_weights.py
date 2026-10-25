@@ -27,13 +27,13 @@ DEFAULT_ENDPOINT = "https://hf-mirror.com"
 UA = {"User-Agent": "defectvision/0.1 (+https://github.com/nine-Rain/defectvision)"}
 
 
-def fetch(name: str, endpoint: str, out_dir: Path, retries: int = 3) -> Path:
+def fetch(name: str, endpoint: str, out_dir: Path, repo: str = HF_REPO, retries: int = 3) -> Path:
     target = out_dir / name
     if target.exists() and target.stat().st_size > 1_000_000:
         print(f"  {name} 已存在，跳过")
         return target
 
-    url = f"{endpoint}/{HF_REPO}/resolve/main/{name}"
+    url = f"{endpoint}/{repo}/resolve/main/{name}"
     last_error: Exception | None = None
     for attempt in range(retries):
         try:
@@ -60,13 +60,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="默认 hf-mirror.com")
     parser.add_argument("--out", default=".", help="保存目录，默认仓库根目录")
+    parser.add_argument(
+        "--repo",
+        default=HF_REPO,
+        help="HF 上的官方权重仓库：Ultralytics/YOLO11、Ultralytics/YOLOv8、Ultralytics/RT-DETR",
+    )
     args = parser.parse_args(argv)
 
     out_dir = repo_path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"下载到 {out_dir}")
     for name in args.model:
-        fetch(name, args.endpoint, out_dir)
+        fetch(name, args.endpoint, out_dir, repo=args.repo)
     print("完成。Ultralytics 会优先使用当前目录下的同版权重，不会再联网。")
     return 0
 

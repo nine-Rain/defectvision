@@ -1,0 +1,15 @@
+{
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\cbam-aug\\best.pt",
+  "backend": "pt",
+  "imgsz": 512,
+  "runs": 30,
+  "size_mb": 158.31,
+  "params": 41419356,
+  "mean_ms": 34.63,
+  "p50_ms": 34.27,
+  "p95_ms": 37.26,
+  "min_ms": 32.43,
+  "max_ms": 42.26,
+  "fps": 28.9,
+  "device": "0"
+}

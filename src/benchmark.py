@@ -30,6 +30,17 @@ def collect_images(data: str, split: str, limit: int) -> list[Path]:
     return images[:limit]
 
 
+def _is_custom_checkpoint(weights: Path) -> bool:
+    """区分 YOLO 权重和我们自己 torch.save 的 checkpoint（后者带 meta 字段）。"""
+    try:
+        import torch
+
+        checkpoint = torch.load(str(weights), map_location="cpu", weights_only=False)
+        return isinstance(checkpoint, dict) and "meta" in checkpoint
+    except Exception:  # noqa: BLE001 - 读不了就当 YOLO 处理
+        return False
+
+
 def benchmark(
     weights: Path,
     images: list[Path],
@@ -38,22 +49,45 @@ def benchmark(
     imgsz: int = 640,
     device: str | None = None,
 ) -> dict:
-    from ultralytics import YOLO
+    """统一走 src.detectors，YOLO 的 .pt/.onnx 和自研 checkpoint 都能测。
 
-    model = YOLO(str(weights))
+    注意：自研模型是 512 固定输入，imgsz 参数对它只用于日志记录。
+    """
+    import numpy as np
+    from PIL import Image
+
+    from src.detectors import TorchvisionDetector
+
+    model_obj = None
+    if _is_custom_checkpoint(weights):
+        detector = TorchvisionDetector(weights, names={}, device=device or "auto")
+        model_obj = detector.model
+
+        def predict(path: Path) -> None:
+            array = np.asarray(Image.open(path).convert("RGB"))
+            detector.predict(array, conf=0.25)
+
+    else:
+        from ultralytics import YOLO
+
+        model = YOLO(str(weights))
+        model_obj = getattr(model, "model", None)
+
+        def predict(path: Path) -> None:
+            model.predict(str(path), imgsz=imgsz, device=device, verbose=False)
+
     for image in images[:warmup]:
-        model.predict(str(image), imgsz=imgsz, device=device, verbose=False)
+        predict(image)
 
     samples = []
     for index in range(runs):
         image = images[index % len(images)]
         start = time.perf_counter()
-        model.predict(str(image), imgsz=imgsz, device=device, verbose=False)
+        predict(image)
         samples.append((time.perf_counter() - start) * 1000)
 
     samples.sort()
     params = None
-    model_obj = getattr(model, "model", None)
     if model_obj is not None:
         try:
             params = int(sum(p.numel() for p in model_obj.parameters()))
@@ -101,8 +135,10 @@ def main(argv: list[str] | None = None) -> int:
 
     results_dir = repo_path("results")
     results_dir.mkdir(parents=True, exist_ok=True)
-    # 同一份权重的 .pt / .onnx 名字可能都叫 best，用 格式+设备 区分，避免互相覆盖
-    label = f"{weights.stem}_{weights.suffix.lstrip('.')}"
+    # 不同实验目录下的权重常常都叫 best.pt，用「实验名 + 格式 + 设备」三者拼出唯一名字，
+    # 否则 YOLOv8s 的基准会把 YOLO11n 的覆盖掉（踩过一次）
+    run = weights.parent.parent.name if weights.parent.name == "weights" else weights.parent.name
+    label = f"{run}_{weights.stem}_{weights.suffix.lstrip('.')}"
     if args.device:
         label += f"_{args.device}"
     target = results_dir / f"benchmark_{label}.json"

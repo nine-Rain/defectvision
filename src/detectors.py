@@ -104,7 +104,8 @@ class TorchvisionDetector(BaseDetector):
         import torch
 
         if device != "auto":
-            return device
+            # 命令行习惯写 "0"，但 torch 要 "cuda" 或 "cuda:0"
+            return f"cuda:{device}" if device.isdigit() else device
         return "cuda" if torch.cuda.is_available() else "cpu"
 
     def predict(self, image: np.ndarray, conf: float = 0.25) -> DetectionResult:

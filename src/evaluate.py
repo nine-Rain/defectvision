@@ -120,8 +120,11 @@ def write_table(results_dir: Path) -> str:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
-        # export_*.json 是导出清单（只有体积和格式），不是评估结果，别混进对比表
+        # export_*.json 是导出清单（只有体积和格式），不是评估结果，别混进对比表；
+        # grading_*.json 是分级实验，字段是一致率，也不该出现在这张 mAP 表里
         if not isinstance(data, dict) or "tag" not in data:
+            continue
+        if "exact_accuracy" in data or data.get("mAP50-95") is None:
             continue
         rows.append(data)
     if not rows:
