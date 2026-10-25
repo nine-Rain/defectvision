@@ -105,27 +105,32 @@ def write_table(results_dir: Path) -> str:
     rows = []
     for path in sorted(results_dir.glob("*.json")):
         try:
-            rows.append(json.loads(path.read_text(encoding="utf-8")))
+            data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
+        # export_*.json 是导出清单（只有体积和格式），不是评估结果，别混进对比表
+        if not isinstance(data, dict) or "tag" not in data:
+            continue
+        rows.append(data)
     if not rows:
         return "还没有评估结果，先跑一次 src.evaluate。"
 
     rows.sort(key=lambda r: (r.get("mAP50-95") or -1), reverse=True)
+    # 这里不放推理延迟：val 期间测的时间受设备/后端影响，和 benchmark_*.json 的
+    # p50/p95 不是一回事。两张表混在一起只会让人对不上数。
     lines = [
-        "| 方案 | mAP50-95 | mAP50 | Precision | Recall | 体积 (MB) | 推理 (ms) | 备注 |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+        "| 方案 | mAP50-95 | mAP50 | Precision | Recall | 体积 (MB) | 备注 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for row in rows:
         lines.append(
-            "| {tag} | {map95} | {map50} | {p} | {r} | {size} | {ms} | {note} |".format(
+            "| {tag} | {map95} | {map50} | {p} | {r} | {size} | {note} |".format(
                 tag=row.get("tag", "?"),
                 map95=_fmt(row.get("mAP50-95")),
                 map50=_fmt(row.get("mAP50")),
                 p=_fmt(row.get("precision")),
                 r=_fmt(row.get("recall")),
                 size=_fmt(row.get("size_mb"), 2),
-                ms=_fmt(row.get("inference_ms"), 2),
                 note=row.get("note", ""),
             )
         )
@@ -137,7 +142,7 @@ def write_table(results_dir: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m src.evaluate", description="评估并生成对比表")
     parser.add_argument("--weights")
-    parser.add_argument("--data", default="configs/dataset.yaml")
+    parser.add_argument("--data", default="configs/dataset.msdd.yaml")
     parser.add_argument("--split", default="val", choices=["train", "val", "test"])
     parser.add_argument("--tag", help="实验名，默认取权重所在目录名")
     parser.add_argument("--note", default="", help="写进对比表的备注")

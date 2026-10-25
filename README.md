@@ -44,13 +44,37 @@
 
 ## 结果
 
-> 跑完 `python -m src.evaluate --compare` 后，这张表由 `results/metrics.md` 自动生成。
-> 手抄的数字一定会有笔误，所以表格从来不是手写的。
+![验证集预测示例](docs/assets/sample_prediction.jpg)
 
-| 方案 | mAP50 | mAP50-95 | 体积 (MB) | 推理 (ms) | 备注 |
-| --- | ---: | ---: | ---: | ---: | --- |
-| yolo11n 冒烟（1 epoch） | 0.161 | 0.093 | 5.2 | 1.9 | 只验证流水线，无参考价值 |
-| yolo11n 微调（50 epochs） | 待填 | 待填 | 5.2 | 待填 | `runs/baseline` |
+*左图：真实标注；右图：模型预测（`runs/baseline/val_batch0_pred.jpg`）。*
+
+### 精度（test split，150 张，全程未参与训练）
+
+| 方案 | mAP50 | mAP50-95 | Precision | Recall | 体积 (MB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| yolo11n 微调 50ep @512 | 0.559 | 0.384 | 0.668 | 0.530 | 5.24 |
+| └ 导出 ONNX fp32 | 0.561 | 0.376 | 0.699 | 0.523 | 10.12 |
+| └ 导出 ONNX INT8 | 0.560 | 0.376 | 0.667 | 0.532 | **2.88** |
+
+> 这张表由 `results/metrics.md` 生成，不是手抄的：`python -m src.evaluate --compare`。
+
+### 延迟（i9-12900HX / RTX 4060 8G，imgsz=512，50 次取分位）
+
+| 模型 | 设备 | p50 (ms) | p95 (ms) | FPS |
+| --- | --- | ---: | ---: | ---: |
+| best.pt | RTX 4060 | **9.62** | 12.74 | 101 |
+| best.pt | CPU | 36.11 | 41.00 | 28 |
+| best.onnx (fp32) | CPU | 21.33 | 22.92 | 48 |
+| best.onnx (INT8) | CPU | 44.00 | 47.74 | 23 |
+
+三个结论，都能在面试里展开讲：
+
+1. **ONNX 在 CPU 上比 PyTorch 快 40%**（21.3 vs 36.1ms）——图优化和算子融合是实打实的。
+2. **INT8 体积降到 1/3.5、精度几乎不掉，但在 CPU 上反而慢了约一倍**。
+   小模型 + 无 VNNI 加速时，反量化开销盖过了算力收益。**量化不是免费的，必须实测**。
+3. GPU 上 p50 9.6ms，对应约 100 FPS，产线节拍要求 30 FPS 的话余量很大。
+   如果真要上端侧（ARM/树莓派），应该重新导出 OpenVINO / NCNN，而不是拿这份 CPU 数据外推。
+
 
 ## 快速开始
 
@@ -163,6 +187,9 @@ defectvision/
 | `pip install ultralytics` 卡 10 分钟，CPU 100% | 网速慢 | 网络正常，是解析器回溯 | 换 `uv`，秒装 |
 | 下载权重报证书错误 | 缺 CA | 换 certifi 仍失败 | 链路有中间人；改从 HF 镜像取官方权重 |
 | 训练集提示 "2 duplicate labels removed" | 数据脏 | 同一张图里框完全重合 | Ultralytics 自动去重，无需处理，但要记在心里 |
+| 导出 ONNX 后延迟从 2ms 变 14ms，以为量化把模型搞坏了 | 导出有问题 | 发现 `.pt` 跑 GPU、`.onnx` 跑 CPU | 基准必须固定设备，否则结论全是假的 |
+| INT8 比 FP32 还慢一倍（44 vs 21ms） | 量化必然更快 | 同设备复测仍然如此 | 小模型 + CPU 无 VNNI，反量化开销主导；要提速得换 OpenVINO / NCNN |
+| 对比表里混进 `export_*.json`，多出两行 `?` | 表格读错文件 | 看到那几个 json 没有 `tag` 字段 | 导出清单不是评估结果，读表时按 `tag` 过滤 |
 
 ## 常见问题
 

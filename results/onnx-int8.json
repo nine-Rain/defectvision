@@ -1,0 +1,21 @@
+{
+  "tag": "onnx-int8",
+  "note": "ONNX INT8",
+  "created_at": "2026-10-25T19:31:20",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\models\\best_int8.onnx",
+  "size_mb": 2.88,
+  "params": null,
+  "split": "test",
+  "raw": {
+    "metrics/precision(B)": 0.6673291081336715,
+    "metrics/recall(B)": 0.5321299315272062,
+    "metrics/mAP50(B)": 0.5602065780650362,
+    "metrics/mAP50-95(B)": 0.375910937814249,
+    "fitness": 0.375910937814249
+  },
+  "mAP50-95": 0.375910937814249,
+  "mAP50": 0.5602065780650362,
+  "precision": 0.6673291081336715,
+  "recall": 0.5321299315272062,
+  "inference_ms": 32.53472866669957
+}

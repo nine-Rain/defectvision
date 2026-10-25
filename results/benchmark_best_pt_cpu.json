@@ -1,0 +1,15 @@
+{
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\baseline\\weights\\best.pt",
+  "backend": "pt",
+  "imgsz": 512,
+  "runs": 30,
+  "size_mb": 5.24,
+  "params": 2606098,
+  "mean_ms": 35.77,
+  "p50_ms": 36.11,
+  "p95_ms": 41.0,
+  "min_ms": 30.63,
+  "max_ms": 42.4,
+  "fps": 28.0,
+  "device": "cpu"
+}

@@ -31,19 +31,24 @@ def collect_images(data: str, split: str, limit: int) -> list[Path]:
 
 
 def benchmark(
-    weights: Path, images: list[Path], warmup: int = 5, runs: int = 30, imgsz: int = 640
+    weights: Path,
+    images: list[Path],
+    warmup: int = 5,
+    runs: int = 30,
+    imgsz: int = 640,
+    device: str | None = None,
 ) -> dict:
     from ultralytics import YOLO
 
     model = YOLO(str(weights))
     for image in images[:warmup]:
-        model.predict(str(image), imgsz=imgsz, verbose=False)
+        model.predict(str(image), imgsz=imgsz, device=device, verbose=False)
 
     samples = []
     for index in range(runs):
         image = images[index % len(images)]
         start = time.perf_counter()
-        model.predict(str(image), imgsz=imgsz, verbose=False)
+        model.predict(str(image), imgsz=imgsz, device=device, verbose=False)
         samples.append((time.perf_counter() - start) * 1000)
 
     samples.sort()
@@ -74,11 +79,16 @@ def benchmark(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m src.benchmark", description="延迟基准")
     parser.add_argument("--weights", required=True)
-    parser.add_argument("--data", default="configs/dataset.yaml")
+    parser.add_argument("--data", default="configs/dataset.msdd.yaml")
     parser.add_argument("--split", default="val", choices=["train", "val", "test"])
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--runs", type=int, default=30)
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="cpu | 0 | ...；ONNX 默认 CPU，.pt 默认会用 GPU，对比时务必显式限定同一个设备",
+    )
     args = parser.parse_args(argv)
 
     weights = repo_path(args.weights)
@@ -86,14 +96,19 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"找不到权重: {weights}")
 
     images = collect_images(args.data, args.split, limit=max(args.runs, args.warmup, 1))
-    result = benchmark(weights, images, args.warmup, args.runs, args.imgsz)
+    result = benchmark(weights, images, args.warmup, args.runs, args.imgsz, args.device)
+    result["device"] = args.device or "auto"
 
     results_dir = repo_path("results")
     results_dir.mkdir(parents=True, exist_ok=True)
-    target = results_dir / f"benchmark_{weights.stem}.json"
+    # 同一份权重的 .pt / .onnx 名字可能都叫 best，用 格式+设备 区分，避免互相覆盖
+    label = f"{weights.stem}_{weights.suffix.lstrip('.')}"
+    if args.device:
+        label += f"_{args.device}"
+    target = results_dir / f"benchmark_{label}.json"
     target.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"{weights.name}  ({result['backend']}, imgsz={args.imgsz}, n={args.runs})")
+    print(f"{weights.name}  ({result['backend']}, imgsz={args.imgsz}, device={result['device']}, n={args.runs})")
     print(f"  体积      {result['size_mb']} MB")
     print(f"  平均       {result['mean_ms']} ms")
     print(f"  p50 / p95  {result['p50_ms']} / {result['p95_ms']} ms")

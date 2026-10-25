@@ -1,0 +1,10 @@
+{
+  "created_at": "2026-10-25T19:30:31",
+  "source": "D:\\deep seek-harness\\projects\\defectvision\\runs\\baseline\\weights\\best.pt",
+  "format": "onnx",
+  "imgsz": 512,
+  "int8": false,
+  "dynamic": false,
+  "output": "D:\\deep seek-harness\\projects\\defectvision\\models\\best.onnx",
+  "size_mb": 10.12
+}

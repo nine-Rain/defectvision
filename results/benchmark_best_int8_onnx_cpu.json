@@ -1,0 +1,15 @@
+{
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\models\\best_int8.onnx",
+  "backend": "onnx",
+  "imgsz": 512,
+  "runs": 50,
+  "size_mb": 2.88,
+  "params": null,
+  "mean_ms": 43.05,
+  "p50_ms": 44.0,
+  "p95_ms": 47.74,
+  "min_ms": 36.43,
+  "max_ms": 49.17,
+  "fps": 23.2,
+  "device": "cpu"
+}
