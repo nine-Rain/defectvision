@@ -40,6 +40,9 @@ class GradeResult:
     # 每个判据各自给出的等级，例如 {"面积占比": 4, "缺陷数量": 1, "裂纹": 4}
     # 界面上单独展示，这样"为什么判 IV 级"一眼能看出来，不会被单个数字误导
     criteria: dict[str, int] = field(default_factory=dict)
+    # 面积实际用了哪种口径："mask"（掩码像素）或 "box"（框并集）。
+    # 两者的数值不可比，必须显示出来，否则用户会拿不同口径的百分比互相比较。
+    area_basis: str = "box"
 
     def to_dict(self) -> dict:
         return {
@@ -47,6 +50,7 @@ class GradeResult:
             "level_name": self.level_name,
             "action": self.action,
             "score": round(self.score, 2),
+            "area_basis": self.area_basis,
             "features": {k: round(v, 4) for k, v in self.features.items()},
             "criteria": self.criteria,
             "reasons": self.reasons,
@@ -161,10 +165,14 @@ def grade(
 
     # ---------- 特征量化 ----------
     boxes = [d.box for d in kept]
-    # 有掩码就用掩码面积（更接近真实缺陷面积），否则退回框并集。
-    # 这一步直接决定"面积判据"是否虚高——框会把背景一起算进去。
-    mask_ratio = _mask_area_ratio(kept, width, height)
-    area_ratio = mask_ratio if mask_ratio is not None else _union_area_ratio(boxes, width, height)
+    # 面积口径：mask 用掩码像素、box 用框并集、auto 有掩码就用掩码。
+    # 框会把"缺陷+背景"一起算进去，模型框越松面积越虚高——换分辨率就会失效。
+    area_source = str(cfg.get("area_source", "auto")).lower()
+    mask_ratio = _mask_area_ratio(kept, width, height) if area_source != "box" else None
+    if mask_ratio is not None:
+        area_ratio, area_basis = mask_ratio, "mask"
+    else:
+        area_ratio, area_basis = _union_area_ratio(boxes, width, height), "box"
     count = len(kept)
     severity_max = max(severity_map.get(d.cls_name, 2) for d in kept)
 
@@ -263,6 +271,7 @@ def grade(
         reasons=reasons,
         defects=defects,
         criteria=dict(candidates),
+        area_basis=area_basis,
     )
 
 
@@ -290,7 +299,8 @@ def format_report(
         "-" * 46,
         "量化特征:",
         f"  缺陷数量      {int(result.features.get('count', 0))}",
-        f"  覆盖面积占比  {result.features.get('area_ratio', 0) * 100:.2f}%",
+        f"  覆盖面积占比  {result.features.get('area_ratio', 0) * 100:.2f}%"
+        f"（{'掩码像素' if result.area_basis == 'mask' else '检测框'}口径）",
         f"  最高严重度    {int(result.features.get('severity', 0))} / 4（类型基准，不直接决定等级）",
         f"  分布覆盖      {result.features.get('spread', 0) * 100:.1f}%",
     ]

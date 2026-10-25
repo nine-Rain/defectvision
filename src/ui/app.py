@@ -289,7 +289,10 @@ class MainWindow(QMainWindow):
         self.level_label.setText(text)
         self.level_label.setStyleSheet(badge_style(verdict.level))
         self.action_label.setText(f"处置：{verdict.action}")
-        self.score_label.setText(f"综合得分 {verdict.score:.1f} / 100（仅供参考，不参与定级）")
+        basis = "掩码" if verdict.area_basis == "mask" else "检测框"
+        self.score_label.setText(
+            f"综合得分 {verdict.score:.1f} / 100（仅供参考）　｜　面积口径：{basis}"
+        )
 
         if verdict.criteria:
             roman = {1: "I", 2: "II", 3: "III", 4: "IV"}

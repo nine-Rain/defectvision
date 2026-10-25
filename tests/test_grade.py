@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from src.detectors import Detection
@@ -136,6 +137,55 @@ def test_criteria_are_reported_per_rule():
     assert result.criteria["缺陷数量"] == 1      # 只有 1 处
     assert result.criteria["贯穿性裂纹"] == 4    # 长度 82% >= 80%，这条把它拉到 IV
     assert max(result.criteria.values()) == result.level
+
+
+# ---------------------------------------------------------------- 面积口径
+
+
+def mask_of(size: int, left: int = 0, top: int = 0) -> np.ndarray:
+    mask = np.zeros((IMAGE_SIZE[1], IMAGE_SIZE[0]), dtype=bool)
+    mask[top : top + size, left : left + size] = True
+    return mask
+
+
+def test_mask_area_is_smaller_than_box_area():
+    """掩码面积只算缺陷本身，框面积会把背景算进去——这是降低误杀的关键。"""
+    detection = Detection(
+        cls_id=0, cls_name="stain", confidence=0.9, box=square(100), mask=mask_of(30)
+    )
+    by_mask = grade([detection], IMAGE_SIZE).features["area_ratio"]
+    by_box = grade([detection], IMAGE_SIZE, config={**load_grading_config(), "area_source": "box"})
+    assert by_mask < by_box.features["area_ratio"]
+    assert by_mask < 0.01  # 30x30 / 512x512 ≈ 0.34%
+
+
+def test_area_basis_is_reported():
+    box_only = grade([detection("stain", square(50))], IMAGE_SIZE)
+    assert box_only.area_basis == "box"
+
+    with_mask = grade(
+        [Detection(cls_id=0, cls_name="stain", confidence=0.9, box=square(50), mask=mask_of(20))],
+        IMAGE_SIZE,
+    )
+    assert with_mask.area_basis == "mask"
+
+
+def test_force_box_ignores_masks():
+    detection = Detection(
+        cls_id=0, cls_name="stain", confidence=0.9, box=square(100), mask=mask_of(20)
+    )
+    cfg = {**load_grading_config(), "area_source": "box"}
+    result = grade([detection], IMAGE_SIZE, config=cfg)
+    assert result.area_basis == "box"
+    assert result.features["area_ratio"] > 0.03
+
+
+def test_force_mask_falls_back_to_box_without_masks():
+    """配置要求掩码但模型没给，就退回框，并如实标注口径，不能假装是掩码。"""
+    cfg = {**load_grading_config(), "area_source": "mask"}
+    result = grade([detection("stain", square(50))], IMAGE_SIZE, config=cfg)
+    assert result.area_basis == "box"
+
 
 
 def test_defect_table_marks_type_baseline_not_final_level():
