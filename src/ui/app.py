@@ -156,8 +156,11 @@ class MainWindow(QMainWindow):
 
         self.score_label = QLabel("综合得分 —")
         self.score_label.setAlignment(Qt.AlignCenter)
-        self.score_label.setStyleSheet("font-size:14px; color:#aaa;")
+        self.score_label.setWordWrap(True)
+        self.score_label.setMinimumHeight(46)
+        self.score_label.setStyleSheet("font-size:13px; color:#aaa;")
         layout.addWidget(self.score_label)
+        layout.addSpacing(8)
 
         group = QGroupBox("缺陷清单")
         group_layout = QVBoxLayout(group)
