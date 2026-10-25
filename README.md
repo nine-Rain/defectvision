@@ -55,6 +55,27 @@
 数据本身**不进 git**：`python scripts/fetch_dataset.py` 会从镜像拉取（约 72 MB，支持断点续传），
 并在 `data/msdd/SOURCE.md` 里写明出处与许可。
 
+### 第二份数据：NEU-DET（热轧钢带）
+
+用于验证方法能不能跨场景迁移。1800 张 200×200，同样 6 类，YOLO 框标签：
+
+| 划分 | 数量 | 框数 |
+| --- | ---: | ---: |
+| train | 1,458 | 3,365 |
+| val | 162 | 378 |
+| test | 180 | 446 |
+
+![NEU-DET 标注](docs/assets/neu_preview.jpg)
+
+```bash
+python -m src.prepare stats --config configs/dataset.neu-det.yaml
+python -m src.train --dataset configs/dataset.neu-det.yaml --imgsz 320 --name neu-yolo
+```
+
+> 官方页面（[东北大学宋克臣课题组](http://faculty.neu.edu.cn/songkechen/zh_CN/zhym/263269/list/index.htm)）
+> 只提供申请下载；仓库里用的是 GitHub 上的 YOLO 整理版，经代理下载后重新切了 val。
+> 两份数据的缺陷形态差异很大（圆件 vs 钢带），跨数据集结果才有说服力。
+
 ## 结果
 
 ![验证集预测示例](docs/assets/sample_prediction.jpg)

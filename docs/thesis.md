@@ -51,11 +51,21 @@
 | 数据集 | 规模 | 类别 | 用途 |
 | --- | --- | --- | --- |
 | MSDD（金属零件） | 1,195 / 150 / 150 | 6 | 主实验、判级演示 |
-| NEU-DET（热轧钢带） | 1,440 / 180 / 180 | 6 | 泛化性验证（脚本已就绪，见下） |
+| NEU-DET（热轧钢带） | 1,458 / 162 / 180 | 6 | 泛化性验证（已接入） |
 
-> NEU-DET 的接入命令：`python scripts/fetch_dataset.py --repo KeenForgeAI/NEU-DET-corrected --out data/neu-det --slug neu-det`
-> 拉取时如果镜像限流（HTTP 429），把 `--workers` 降到 4~6 重跑即可，脚本支持断点续传。
-> 本机实测镜像对这份数据限流较严，建议换网络时段或改用官方源 `--endpoint https://huggingface.co`。
+NEU-DET 的获取：官方页面只提供人工申请，实际可用的是 GitHub 上的 YOLO 整理版，
+经代理下载后校验通过（4,189 个框，无缺失标签）：
+
+```powershell
+# 已下载并整理到 data/neu-det，配置见 configs/dataset.neu-det.yaml
+python -m src.prepare stats --config configs/dataset.neu-det.yaml
+```
+
+如果想换一份数据重来，脚本支持任意 Hugging Face 上的 YOLO 数据集：
+
+```powershell
+python scripts/fetch_dataset.py --repo KeenForgeAI/NEU-DET-corrected --out data/neu-det --slug neu-det
+```
 
 两份数据的缺陷形态差异很大（圆件 vs 钢板），跨数据集结果能支撑"方法可迁移"的结论。
 

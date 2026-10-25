@@ -1,0 +1,16 @@
+# NEU-DET：热轧钢带表面缺陷（东北大学发布）
+# 1800 张 200x200 灰度转 RGB，6 类，YOLO 边界框标签
+# 本次切分：train 1458 / val 162 / test 180（val 按类别分层从 train 中抽 10%）
+path: data/neu-det
+
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: crazing          # 龟裂
+  1: inclusion        # 夹杂
+  2: patches          # 斑块
+  3: pitted_surface   # 麻点
+  4: rolled-in_scale  # 压入氧化皮
+  5: scratches        # 划痕
