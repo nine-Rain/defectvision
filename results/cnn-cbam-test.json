@@ -1,0 +1,20 @@
+{
+  "tag": "cnn-cbam-test",
+  "note": "resnet50+FPN+CBAM，20ep@512，MSDD test",
+  "created_at": "2026-10-25T22:10:31",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\cnn-cbam\\best.pt",
+  "size_mb": 158.31,
+  "params": 41419356,
+  "task": "detect",
+  "split": "test",
+  "mAP50-95": 0.24748264253139496,
+  "mAP50": 0.47551748156547546,
+  "precision": null,
+  "recall": 0.3691886067390442,
+  "raw": {
+    "mAP50-95": 0.24748264253139496,
+    "mAP50": 0.47551748156547546,
+    "mAP75": 0.20061840116977692,
+    "recall": 0.3691886067390442
+  }
+}

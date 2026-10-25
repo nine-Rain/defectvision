@@ -1,0 +1,23 @@
+{
+  "tag": "neu-yolo-test",
+  "note": "yolo11n 50ep @320，NEU test",
+  "created_at": "2026-10-25T21:50:04",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\neu-yolo\\weights\\best.pt",
+  "size_mb": 5.22,
+  "params": 2606098,
+  "task": "detect",
+  "split": "test",
+  "raw": {
+    "metrics/precision(B)": 0.6966813815024913,
+    "metrics/recall(B)": 0.6876064187909922,
+    "metrics/mAP50(B)": 0.7492257865758617,
+    "metrics/mAP50-95(B)": 0.4040972067784715,
+    "fitness": 0.4040972067784715
+  },
+  "mAP50-95": 0.4040972067784715,
+  "mAP50": 0.7492257865758617,
+  "precision": 0.6966813815024913,
+  "recall": 0.6876064187909922,
+  "box_mAP50": null,
+  "inference_ms": 1.4240022221606017
+}
