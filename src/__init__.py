@@ -13,3 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 # 这个目录名和包名 ultralytics 只差大小写，Windows 上会让 ruff 把它误判为本地模块，
 # 导致"本地 lint 通过、CI 挂掉"。统一挪进 runs/。
 os.environ.setdefault("YOLO_CONFIG_DIR", str(_REPO_ROOT / "runs" / "ultralytics"))
+
+# torchvision 预训练权重默认下到 ~/.cache/torch，某些机器上该目录不可写。
+# 统一放到 runs/torch，仓库已经忽略 runs/。
+os.environ.setdefault("TORCH_HOME", str(_REPO_ROOT / "runs" / "torch"))

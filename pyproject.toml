@@ -15,18 +15,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 训练 + 评估 + 导出
+# YOLO 路线：训练 + 评估 + 导出
 train = [
     "ultralytics>=8.3",
     "onnx>=1.16",
     "onnxruntime>=1.18",
 ]
-# 本地 Demo
+# 自研 CNN 路线（ResNet + FPN + CBAM）
+cnn = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "torchmetrics>=1.4",
+    "faster-coco-eval>=1.6",
+]
+# 桌面端
+ui = ["PyQt5>=5.15"]
+# 网页 Demo
 demo = ["gradio>=4.0"]
-dev = ["pytest>=8.0", "ruff>=0.5"]
+dev = ["pytest>=8.0", "ruff>=0.5", "numpy>=1.24"]
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["src", "src.data", "src.models", "src.ui"]
 
 [tool.ruff]
 line-length = 100

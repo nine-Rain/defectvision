@@ -1,0 +1,40 @@
+# 缺陷等级判定规则。
+#
+# 这一层不训练模型，是纯规则：把检测结果量化成可解释的特征，再映射到 I~IV 级。
+# 论文里可以直接引用这张表，产线上也能由工艺人员自己调阈值，不用重训模型。
+
+# 缺陷类型的严重度（1=轻微，4=致命）。工艺上认为折叠/氧化直接报废，划痕可返修。
+class_severity:
+  stain: 1
+  scratch: 2
+  dark_spot: 2
+  porosity: 3
+  oxidation: 3
+  fold: 4
+
+# 四个特征的归一化上限：达到这个值就记满分
+normalizers:
+  area_ratio: 0.10     # 缺陷总面积占整图 10% 记满分
+  count: 10            # 10 个缺陷记满分
+  spread: 0.50         # 缺陷外接框覆盖半张图记满分
+
+# 特征权重，和为 1
+weights:
+  area: 0.40
+  count: 0.25
+  severity: 0.25
+  spread: 0.10
+
+# 综合得分 -> 等级（左闭右开）
+levels:
+  - {level: 1, name: "I级 轻微", upper: 25}
+  - {level: 2, name: "II级 中度", upper: 50}
+  - {level: 3, name: "III级 严重", upper: 75}
+  - {level: 4, name: "IV级 致命", upper: 101}
+
+# 一票否决规则：只要有严重度 >= 这个值且面积占比超过 min_area 的缺陷，
+# 最终等级不得低于 forced_level。
+veto:
+  severity_gte: 4
+  min_area_ratio: 0.005
+  forced_level: 3

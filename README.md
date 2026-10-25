@@ -1,9 +1,15 @@
 # DefectVision
 
-**在公开数据集上微调一个表面缺陷检测模型，并把「基线 → 微调 → 量化 → 部署」的每一步都用同一套验证集量出来。**
+**同一份数据，两条技术路线，一个能交付的系统。**
+
+| 线 | 内容 | 产物 |
+| --- | --- | --- |
+| 快线 | YOLO11n 微调 → ONNX 量化 → 网页 Demo | mAP50 **0.559**，INT8 后 2.88 MB |
+| 深线 | ResNet50 + FPN + CBAM 自研检测器，与 YOLO 同台对比 | CBAM 消融实验 |
+| 系统 | 缺陷四级判定 + PyQt5 桌面端 | 导入 → 检测 → 分级 → 报告 |
 
 默认数据集是 [MSDD](https://huggingface.co/datasets/rltjr/metal-surface-defect-v1)（金属零件表面缺陷，6 类，1,300 张），
-全流程一条命令可复现；换成你自己的产线数据只需改一个 YAML。
+另一份 NEU-DET（热轧钢带）用同一条命令接入；换成你自己的产线数据只需改一个 YAML。
 
 <!-- 徽章：推到 GitHub 后换成你自己的地址
 [![CI](https://github.com/nine-Rain/defectvision/actions/workflows/ci.yml/badge.svg)](https://github.com/nine-Rain/defectvision/actions/workflows/ci.yml)
@@ -12,12 +18,11 @@
 ## 为什么做这个
 
 现成模型在**你的**场景上通常不够用：类别不认识、小目标漏检、光照一变就崩。
-但"从头训一个模型"既慢又没必要。这个项目的思路是：
+这个项目不满足于"跑通一个 YOLO"，而是要把三件事都做成可交付：
 
-> 先用 COCO 预训练权重拿到零样本基线 → 用领域数据微调 → 量化上端侧 →
-> 用同一套验证集把每一步的收益和代价都量出来。
-
-所以它产出的不是"一个模型"，而是**一张能被追问的证据表**。
+1. **能用**：一条命令下载数据、训练、量化、起界面；
+2. **能讲**：每个结论都有对照实验，指标由脚本生成而不是手抄；
+3. **能查**：判级规则可解释、可配置，产线改阈值不用重训模型。
 
 ## 数据集：MSDD
 
@@ -105,6 +110,63 @@
    **数据的上限就是模型的上限**，这句话在这里是可验证的，不是套话。
 
 代价也很实在：分割的后处理 3.9ms vs 检测 1.4ms，模型多 26 万参数。**要不要分割，取决于你的下游是"数个数"还是"量面积"**——只做计数和定位，检测足够。
+
+## 改进模型：ResNet50 + FPN + CBAM
+
+除了拿 YOLO 当强基线，仓库里还有一条**自己搭的检测器**，对应论文里的"改进 CNN 模型层"：
+
+```
+输入 512×512
+  └─ ResNet50（layer1~layer4 → C2/C3/C4/C5）
+  └─ FPN：自顶向下融合 + 3×3 平滑，统一 256 通道，5 个尺度
+  └─ CBAM ×5：通道注意力（看什么）+ 空间注意力（看哪里）
+  └─ RPN + ROI Align + 分类/回归头
+```
+
+| 组件 | 文件 | 作用 |
+| --- | --- | --- |
+| CBAM | `src/models/cbam.py` | 通道 + 空间注意力，逐层加权 FPN 特征 |
+| 骨干 + FPN | `src/models/detector.py` | ResNet50 多尺度特征 + 金字塔融合 |
+| 数据管道 | `src/data/yolo_dataset.py` | YOLO 标签（框或多边形）→ torchvision 输入 |
+| 训练 | `src/train_cnn.py` | AMP、余弦退火、每轮 mAP 评估 |
+| 评估 | `torchmetrics` + `faster-coco-eval` | 不用 pycocotools，Windows 上也能装 |
+
+```bash
+python -m src.train_cnn --name cnn-cbam --epochs 20          # 完整模型
+python -m src.train_cnn --name cnn-nocbam --no-cbam --epochs 20   # 消融
+python -m src.evaluate --compare                              # 进同一张对比表
+```
+
+**为什么不用"从零写一个网络"**：检测头的正负样本分配、anchor、NMS、损失平衡，
+写错一个就训不起来，且和"改进点"无关。把变量控制在 backbone 上，消融实验才说得清——
+这是能写进论文的取舍，也是答辩时最容易被追问的地方。
+
+完整的"流程图 → 代码"对照、实验设计和论文图表清单见 [docs/thesis.md](docs/thesis.md)。
+
+## 缺陷分级 + 桌面端
+
+![桌面端](docs/assets/ui.png)
+
+检测只回答"有没有、在哪"，产线还要回答"**能不能放行**"。所以有一层纯规则判级：
+
+| 特征 | 含义 | 归一化上限 | 权重 |
+| --- | --- | --- | ---: |
+| area_ratio | 缺陷总面积 / 图像面积 | 10% | 0.40 |
+| count | 缺陷个数 | 10 | 0.25 |
+| severity | 最严重类别严重度（1~4） | 4 | 0.25 |
+| spread | 缺陷外接框覆盖面积占比 | 50% | 0.10 |
+
+得分 = 100 × Σ(权重 × 归一化特征)，再按 25/50/75 切成 I~IV 级；
+另有**一票否决**：`fold` 这类致命缺陷只要面积超过 0.5%，直接判 III 级以上。
+规则全在 `configs/grading.yaml`，工艺人员改阈值不用重训模型。
+
+```bash
+python -m src.ui --weights runs/baseline/weights/best.pt      # 桌面端
+python -m src.ui --weights runs/cnn-cbam/best.pt              # 换自研模型
+```
+
+界面功能：打开图片 / 批量检测 / 调置信度阈值 / 实时显示等级与得分 / 缺陷清单 /
+一键导出报告（txt + 标注图）/ 批量导出 CSV 汇总。
 
 ## 快速开始
 
