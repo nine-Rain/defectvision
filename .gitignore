@@ -15,6 +15,10 @@ pip_*.log
 # pip 的临时下载文件（TEMP 不可用时它会落在仓库根目录）
 tmp*
 
+# 本地工具与缓存（uv 等）
+tools/
+.uv-cache/
+
 # --- 数据与模型产物（绝对不要提交） ---
 # 图片进 git 会让仓库变成几 GB，别人 clone 一次就跑了。
 data/*
@@ -46,3 +50,6 @@ flagged/
 .DS_Store
 Thumbs.db
 *.log
+
+# Ultralytics ����ʱ���ɵı������ã�������·�������ý��ֿ⣩
+Ultralytics/

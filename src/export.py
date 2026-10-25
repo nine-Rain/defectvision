@@ -13,7 +13,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from src.config import repo_path
+from src.config import materialize_dataset, repo_path
 
 
 def export(
@@ -32,7 +32,7 @@ def export(
             format=fmt,
             imgsz=imgsz,
             int8=int8,
-            data=str(repo_path(data)),
+            data=str(materialize_dataset(data)),
             dynamic=dynamic,
             simplify=True,
         )

@@ -54,6 +54,23 @@ def load_dataset(path: str | Path = "configs/dataset.yaml") -> dict[str, Any]:
     return data
 
 
+def materialize_dataset(
+    path: str | Path = "configs/dataset.yaml", out: str | Path | None = None
+) -> Path:
+    """把数据集配置里的相对 path 转成绝对路径，落到 runs/_resolved_dataset.yaml。
+
+    Ultralytics 解析 dataset.yaml 时，相对 path 是拼到它自己的 settings.datasets_dir
+    上的，不是相对配置文件——直接传原始 yaml 会出现"在 projects/datasets 下面找图片"
+    这种莫名其妙的报错。这里统一解析好再交给它。
+    """
+    cfg = load_dataset(path)
+    cfg["path"] = str(repo_path(cfg["path"]).resolve())
+    target = repo_path(out) if out else repo_path("runs") / "_resolved_dataset.yaml"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return target
+
+
 @dataclass(slots=True)
 class TrainConfig:
     """训练超参。字段名与 Ultralytics 的参数名保持一致，便于直接透传。"""

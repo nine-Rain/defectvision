@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-import pytest
+from pathlib import Path
 
-from src.config import REPO_ROOT, TrainConfig, load_dataset, load_yaml, repo_path
+import pytest
+import yaml
+
+from src.config import (
+    REPO_ROOT,
+    TrainConfig,
+    load_dataset,
+    load_yaml,
+    materialize_dataset,
+    repo_path,
+)
 
 
 def test_train_config_reads_shipped_yaml():
@@ -58,3 +68,17 @@ def test_load_yaml_missing_file(tmp_path):
 def test_repo_path_is_absolute():
     assert repo_path("configs").is_absolute()
     assert repo_path("configs").parent == REPO_ROOT
+
+
+def test_materialize_dataset_absolutizes_path(tmp_path):
+    """相对 path 必须被改写成绝对路径，否则 Ultralytics 会拼到自己的 datasets_dir 上。"""
+    source = tmp_path / "d.yaml"
+    source.write_text(
+        "path: data/msdd\ntrain: images/train\nval: images/val\nnames:\n  0: a\n",
+        encoding="utf-8",
+    )
+    output = materialize_dataset(source, out=tmp_path / "resolved.yaml")
+    data = yaml.safe_load(output.read_text(encoding="utf-8"))
+    assert Path(data["path"]).is_absolute()
+    assert data["path"].endswith("data\\msdd") or data["path"].endswith("data/msdd")
+    assert data["names"] == {0: "a"}

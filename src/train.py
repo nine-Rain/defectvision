@@ -14,7 +14,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from src.config import TrainConfig, load_dataset, repo_path
+from src.config import TrainConfig, load_dataset, materialize_dataset, repo_path
 
 
 def build_config(args: argparse.Namespace) -> TrainConfig:
@@ -61,7 +61,7 @@ def check_dataset(dataset_config: str) -> None:
 
 def train_kwargs(cfg: TrainConfig) -> dict[str, Any]:
     return {
-        "data": str(repo_path(cfg.dataset)),
+        "data": str(materialize_dataset(cfg.dataset)),
         "epochs": cfg.epochs,
         "imgsz": cfg.imgsz,
         "batch": cfg.batch,

@@ -1,21 +1,25 @@
 # ---------------------------------------------------------------------------
 # 训练配置。命令行参数可以覆盖这里的任何一项（见 python -m src.train --help）。
 #
-# 换任务只改两个字段：
+# 默认指向 MSDD 金属表面缺陷数据集（scripts/fetch_dataset.py 下载）：
+#   1195 张训练 / 150 张验证 / 6 类缺陷，512x512，多边形标签
+#
+# 换成你自己的数据：只改 dataset 的路径。
+# 换任务：
 #   检测  -> model: yolo11n.pt
-#   分割  -> model: yolo11n-seg.pt   （数据集标签换成多边形格式）
+#   分割  -> model: yolo11n-seg.pt   （标签是多边形时用这个，能拿到掩码）
 # 换模型：n < s < m < l < x，越大越准也越慢，先用 n 把流程跑通。
 # ---------------------------------------------------------------------------
 model: yolo11n.pt
-dataset: configs/dataset.yaml
+dataset: configs/dataset.msdd.yaml
 
-epochs: 80
-imgsz: 640
+epochs: 50
+imgsz: 512           # MSDD 原图就是 512，放大到 640 只是更慢
 batch: 16
-patience: 20        # 多少轮没提升就早停
+patience: 15         # 多少轮没提升就早停
 seed: 42
 
-device: auto        # auto | cpu | 0 | 0,1
+device: auto         # auto | cpu | 0 | 0,1
 workers: 4
 
 project: runs

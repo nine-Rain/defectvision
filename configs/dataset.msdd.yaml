@@ -1,0 +1,12 @@
+# 由 scripts/fetch_dataset.py 生成，指向 MSDD 数据集（CC BY 4.0）
+path: D:\deep seek-harness\projects\defectvision\data\msdd
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: dark_spot
+  1: fold
+  2: oxidation
+  3: porosity
+  4: scratch
+  5: stain

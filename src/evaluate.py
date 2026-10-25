@@ -17,24 +17,39 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from src.config import repo_path
+from src.config import materialize_dataset, repo_path
 
 RESULT_KEYS = {
-    "mAP50-95": ("mAP50-95",),
-    "mAP50": ("mAP50(B)", "mAP50(M)", "mAP50"),
-    "precision": ("precision(B)", "precision(M)", "precision"),
-    "recall": ("recall(B)", "recall(M)", "recall"),
+    "mAP50-95": ("metrics/mAP50-95(B)", "metrics/mAP50-95(M)"),
+    "mAP50": ("metrics/mAP50(B)", "metrics/mAP50(M)"),
+    "precision": ("metrics/precision(B)", "metrics/precision(M)"),
+    "recall": ("metrics/recall(B)", "metrics/recall(M)"),
 }
 
 
-def _pick(results_dict: dict[str, Any], needles: tuple[str, ...]) -> float | None:
-    """在 results_dict 里按子串匹配取值，兼容检测 (B) 与分割 (M) 的键名。"""
-    for key, value in results_dict.items():
-        if all(needle in key for needle in needles):
+def _pick(results_dict: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+    """按候选键名取值，兼容检测 (B) 与分割 (M)。
+
+    先精确匹配，匹配不到再按后缀模糊匹配。注意 mAP50 不能误取 mAP50-95，
+    所以模糊匹配时要把带 95 的键排除掉——这个坑一开始就踩过，表里数字会张冠李戴。
+    """
+    for key in keys:
+        if key in results_dict:
             try:
-                return float(value)
+                return float(results_dict[key])
             except (TypeError, ValueError):
                 return None
+
+    stem = keys[0].split("/")[-1].split("(")[0]
+    for key, value in results_dict.items():
+        if stem not in key:
+            continue
+        if stem == "mAP50" and "95" in key:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
     return None
 
 
@@ -42,7 +57,9 @@ def evaluate(weights: Path, data: str, split: str, conf: float, iou: float) -> d
     from ultralytics import YOLO
 
     model = YOLO(str(weights))
-    metrics = model.val(data=str(repo_path(data)), split=split, conf=conf, iou=iou, verbose=False)
+    metrics = model.val(
+        data=str(materialize_dataset(data)), split=split, conf=conf, iou=iou, verbose=False
+    )
     raw: dict[str, Any] = dict(getattr(metrics, "results_dict", {}) or {})
 
     params = None
