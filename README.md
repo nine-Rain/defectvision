@@ -39,6 +39,14 @@
 | 4 | scratch | 划痕 | 1,466 |
 | 5 | stain | 污渍 | 255 |
 
+![标注可视化](docs/assets/dataset_preview.jpg)
+
+*用 `python scripts/preview_dataset.py --n 4` 生成。左上为正常样本（空标签），其余是缺陷标注。*
+
+一个能解释指标的现象：标注框普遍很"松"——`porosity` 和 `scratch` 常直接框住大半个零件。
+所以 mAP50（0.56）和 mAP50-95（0.38）差了近 20 个点：**模型大致找对了位置，但贴不紧边界**。
+这不是模型不行，是标签本身的定位精度就到这儿。
+
 数据本身**不进 git**：`python scripts/fetch_dataset.py` 会从镜像拉取（约 72 MB，支持断点续传），
 并在 `data/msdd/SOURCE.md` 里写明出处与许可。
 
