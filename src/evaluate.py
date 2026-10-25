@@ -19,12 +19,19 @@ from typing import Any
 
 from src.config import materialize_dataset, repo_path
 
-RESULT_KEYS = {
-    "mAP50-95": ("metrics/mAP50-95(B)", "metrics/mAP50-95(M)"),
-    "mAP50": ("metrics/mAP50(B)", "metrics/mAP50(M)"),
-    "precision": ("metrics/precision(B)", "metrics/precision(M)"),
-    "recall": ("metrics/recall(B)", "metrics/recall(M)"),
-}
+
+def _result_keys(task: str) -> dict[str, tuple[str, ...]]:
+    """检测模型用 (B) 指标，分割模型用 (M) 指标。
+
+    分割模型其实同时输出框和掩码两套指标，默认取框指标等于把分割能力白做了。
+    """
+    suffix = "M" if task == "segment" else "B"
+    return {
+        "mAP50-95": (f"metrics/mAP50-95({suffix})",),
+        "mAP50": (f"metrics/mAP50({suffix})",),
+        "precision": (f"metrics/precision({suffix})",),
+        "recall": (f"metrics/recall({suffix})",),
+    }
 
 
 def _pick(results_dict: dict[str, Any], keys: tuple[str, ...]) -> float | None:
@@ -57,6 +64,8 @@ def evaluate(weights: Path, data: str, split: str, conf: float, iou: float) -> d
     from ultralytics import YOLO
 
     model = YOLO(str(weights))
+    task = getattr(model, "task", None) or "detect"
+    keys = _result_keys(task)
     metrics = model.val(
         data=str(materialize_dataset(data)), split=split, conf=conf, iou=iou, verbose=False
     )
@@ -74,12 +83,15 @@ def evaluate(weights: Path, data: str, split: str, conf: float, iou: float) -> d
         "weights": str(weights),
         "size_mb": round(weights.stat().st_size / (1024 * 1024), 2) if weights.exists() else None,
         "params": params,
+        "task": task,
         "split": split,
         "raw": raw,
-        "mAP50-95": _pick(raw, RESULT_KEYS["mAP50-95"]),
-        "mAP50": _pick(raw, RESULT_KEYS["mAP50"]),
-        "precision": _pick(raw, RESULT_KEYS["precision"]),
-        "recall": _pick(raw, RESULT_KEYS["recall"]),
+        "mAP50-95": _pick(raw, keys["mAP50-95"]),
+        "mAP50": _pick(raw, keys["mAP50"]),
+        "precision": _pick(raw, keys["precision"]),
+        "recall": _pick(raw, keys["recall"]),
+        # 分割模型额外记一份框指标，方便和检测版横向对比
+        "box_mAP50": _pick(raw, _result_keys("detect")["mAP50"]) if task == "segment" else None,
         "inference_ms": (getattr(metrics, "speed", {}) or {}).get("inference"),
     }
 

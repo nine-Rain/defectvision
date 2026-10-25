@@ -1,0 +1,27 @@
+{
+  "tag": "seg-test",
+  "note": "yolo11n-seg 50ep @512，test（掩码）",
+  "created_at": "2026-10-25T19:55:34",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\baseline-seg\\weights\\best.pt",
+  "size_mb": 5.75,
+  "params": 2858866,
+  "task": "segment",
+  "split": "test",
+  "raw": {
+    "metrics/precision(B)": 0.7251873360786698,
+    "metrics/recall(B)": 0.5209774974211082,
+    "metrics/mAP50(B)": 0.5811660912996608,
+    "metrics/mAP50-95(B)": 0.3789334605084667,
+    "metrics/precision(M)": 0.7396804495229216,
+    "metrics/recall(M)": 0.5200019052333027,
+    "metrics/mAP50(M)": 0.5801611899960815,
+    "metrics/mAP50-95(M)": 0.3426093263999557,
+    "fitness": 0.7215427869084224
+  },
+  "mAP50-95": 0.3426093263999557,
+  "mAP50": 0.5801611899960815,
+  "precision": 0.7396804495229216,
+  "recall": 0.5200019052333027,
+  "box_mAP50": 0.5811660912996608,
+  "inference_ms": 2.5971320000098785
+}

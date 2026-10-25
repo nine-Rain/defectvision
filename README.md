@@ -84,6 +84,28 @@
    如果真要上端侧（ARM/树莓派），应该重新导出 OpenVINO / NCNN，而不是拿这份 CPU 数据外推。
 
 
+## 检测 vs 分割
+
+标签原本就是多边形，所以同一份数据既能转成框训检测，也能直接训分割。两个模型都是 50 轮、512 输入、同一套 test：
+
+| 模型 | 任务 | mAP50 | mAP50-95 | 体积 | 后处理 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| yolo11n | 检测（框） | 0.559 | **0.384** | 5.24 MB | 1.4 ms |
+| yolo11n-seg | 分割（框） | 0.581 | — | 5.75 MB | 3.9 ms |
+| yolo11n-seg | 分割（掩码） | **0.580** | 0.343 | 5.75 MB | 3.9 ms |
+
+![分割效果](docs/assets/seg_prediction.jpg)
+
+三个观察：
+
+1. **IoU=0.5 时分割略胜**（0.580 vs 0.559）。掩码只要能"盖住"缺陷就算命中，比框更宽容。
+2. **高 IoU 时反而更低**（0.343 vs 0.384）。掩码边界比矩形难贴合得多，而且这张数据集的 GT 多边形本身就画得松。
+3. **最该讲的一条**：左上角那张，`fold` 的掩码把整个零件都盖住了，置信度还有 0.76。
+   第一反应是"模型坏了"，但回头看标注——训练集里 `fold` 的 GT 就是这么标的大块区域。
+   **数据的上限就是模型的上限**，这句话在这里是可验证的，不是套话。
+
+代价也很实在：分割的后处理 3.9ms vs 检测 1.4ms，模型多 26 万参数。**要不要分割，取决于你的下游是"数个数"还是"量面积"**——只做计数和定位，检测足够。
+
 ## 快速开始
 
 ```bash
@@ -143,11 +165,14 @@ data/dataset/
 | --- | --- |
 | 下载数据集 | `python scripts/fetch_dataset.py` |
 | 下载权重 | `python scripts/fetch_weights.py --model yolo11n.pt` |
+| 看标注长什么样 | `python scripts/preview_dataset.py --n 4` |
+| 看预测长什么样 | `python scripts/preview_prediction.py --weights runs/baseline/weights/best.pt` |
 | 数据体检 | `python -m src.prepare stats --config configs/dataset.msdd.yaml` |
 | 查重复/泄漏 | `python -m src.prepare dups --config configs/dataset.msdd.yaml` |
 | 切分平铺数据 | `python -m src.prepare split --src data/raw --out data/dataset` |
 | 冒烟训练 | `python -m src.train --smoke` |
 | 正式训练 | `python -m src.train --name baseline` |
+| 训练分割版 | `python -m src.train --model yolo11n-seg.pt --name baseline-seg` |
 | 续训 | `python -m src.train --resume runs/baseline/weights/last.pt` |
 | 评估 | `python -m src.evaluate --weights <path> --tag <name>` |
 | 重建对比表 | `python -m src.evaluate --compare` |
@@ -167,6 +192,8 @@ defectvision/
 ├── scripts/
 │   ├── fetch_dataset.py    # 从 HF 镜像拉数据集，断点续传
 │   ├── fetch_weights.py    # 从 HF 镜像拉预训练权重
+│   ├── preview_dataset.py  # 把标注画到图上，检查标注质量
+│   ├── preview_prediction.py # 跑几张图，拼成预览图
 │   └── make_demo_dataset.py# 造合成数据，离线也能跑通
 ├── src/
 │   ├── config.py           # 配置加载 / 校验 / 路径解析
