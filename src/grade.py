@@ -37,6 +37,9 @@ class GradeResult:
     features: dict[str, float] = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
     defects: list[dict] = field(default_factory=list)
+    # 每个判据各自给出的等级，例如 {"面积占比": 4, "缺陷数量": 1, "裂纹": 4}
+    # 界面上单独展示，这样"为什么判 IV 级"一眼能看出来，不会被单个数字误导
+    criteria: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -45,9 +48,13 @@ class GradeResult:
             "action": self.action,
             "score": round(self.score, 2),
             "features": {k: round(v, 4) for k, v in self.features.items()},
+            "criteria": self.criteria,
             "reasons": self.reasons,
             "defects": self.defects,
         }
+
+
+ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV"}
 
 
 def load_grading_config(path: str | Path = "configs/grading.yaml") -> dict:
@@ -229,6 +236,7 @@ def grade(
         features=features,
         reasons=reasons,
         defects=defects,
+        criteria=dict(candidates),
     )
 
 
@@ -257,13 +265,19 @@ def format_report(
         "量化特征:",
         f"  缺陷数量      {int(result.features.get('count', 0))}",
         f"  覆盖面积占比  {result.features.get('area_ratio', 0) * 100:.2f}%",
-        f"  最高严重度    {int(result.features.get('severity', 0))} / 4",
+        f"  最高严重度    {int(result.features.get('severity', 0))} / 4（类型基准，不直接决定等级）",
         f"  分布覆盖      {result.features.get('spread', 0) * 100:.1f}%",
     ]
     if result.features.get("crack_max_length"):
         lines.append(f"  最长裂纹      {result.features['crack_max_length'] * 100:.1f}% 图像长边")
     if result.features.get("clustered"):
         lines.append("  连片密集      是")
+    if result.criteria:
+        lines.append("-" * 46)
+        lines.append("判据明细（就高不就低）:")
+        for name, level in result.criteria.items():
+            lines.append(f"  {name:<10} {ROMAN.get(level, str(level))} 级")
+        lines.append(f"  {'最终等级':<10} {ROMAN.get(result.level, str(result.level))} 级")
     if result.defects:
         lines.append("-" * 46)
         lines.append("缺陷清单:")

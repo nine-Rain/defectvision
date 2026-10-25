@@ -128,6 +128,23 @@ def test_overlapping_boxes_are_not_double_counted():
     assert result.level == 3
 
 
+def test_criteria_are_reported_per_rule():
+    """界面要能逐条解释"为什么判 IV 级"，所以每个判据的等级都要带出来。"""
+    result = grade([detection("scratch", box(0, 250, 420, 258))], IMAGE_SIZE)
+    assert result.level == 4
+    assert result.criteria["面积占比"] == 2      # 只有 1.3%，面积判据只到 II
+    assert result.criteria["缺陷数量"] == 1      # 只有 1 处
+    assert result.criteria["贯穿性裂纹"] == 4    # 长度 82% >= 80%，这条把它拉到 IV
+    assert max(result.criteria.values()) == result.level
+
+
+def test_defect_table_marks_type_baseline_not_final_level():
+    """单个缺陷的 severity 只是类型基准，不能等于最终等级。"""
+    result = grade([detection("scratch", box(0, 250, 420, 258))], IMAGE_SIZE)
+    assert result.defects[0]["severity"] == 2   # scratch 的类型基准
+    assert result.level == 4                    # 但最终等级由判据决定
+
+
 def test_report_contains_level_action_and_reasons():
     result = grade([detection("stain", square(100))], IMAGE_SIZE)
     report = format_report(result, image_name="a.jpg", model_name="best.pt", elapsed_ms=12.3)

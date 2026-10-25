@@ -144,10 +144,24 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.score_label)
         layout.addSpacing(6)
 
+        # 四个判据各自给了几级，直接摆出来——不然用户看到"严重度 2"会以为系统判错了
+        self.criteria_label = QLabel("")
+        self.criteria_label.setAlignment(Qt.AlignCenter)
+        self.criteria_label.setWordWrap(True)
+        self.criteria_label.setMinimumHeight(38)
+        self.criteria_label.setStyleSheet(
+            "background:#252525; color:#d0d0d0; border-radius:4px; padding:5px; font-size:11px;"
+        )
+        layout.addWidget(self.criteria_label)
+        layout.addSpacing(4)
+
         group = QGroupBox("缺陷清单")
         group_layout = QVBoxLayout(group)
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["类别", "置信度", "面积占比", "严重度"])
+        self.table.setHorizontalHeaderLabels(["类别", "置信度", "面积占比", "类型基准"])
+        self.table.horizontalHeaderItem(3).setToolTip(
+            "缺陷类别的基准严重度（1~4），只参与参考得分；\n定级看面积/数量/裂纹/连片四项判据，取最高。"
+        )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -276,6 +290,15 @@ class MainWindow(QMainWindow):
         self.level_label.setStyleSheet(badge_style(verdict.level))
         self.action_label.setText(f"处置：{verdict.action}")
         self.score_label.setText(f"综合得分 {verdict.score:.1f} / 100（仅供参考，不参与定级）")
+
+        if verdict.criteria:
+            roman = {1: "I", 2: "II", 3: "III", 4: "IV"}
+            parts = [f"{name} {roman.get(level, level)}" for name, level in verdict.criteria.items()]
+            self.criteria_label.setText("判据（就高不就低）：" + " · ".join(parts))
+            self.criteria_label.setVisible(True)
+        else:
+            self.criteria_label.setVisible(False)
+
         self.reason_label.setText("\n".join(f"· {r}" for r in verdict.reasons))
 
         self.table.setRowCount(len(verdict.defects))
