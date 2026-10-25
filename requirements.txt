@@ -1,0 +1,20 @@
+# 不想用 editable 安装（pip install -e .）时，直接：
+#   pip install -r requirements.txt
+#
+# 注意：只有 CPU、没有 NVIDIA 显卡的话，先装 CPU 版 torch，能省 2GB 下载：
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+pyyaml>=6.0
+pillow>=10.0
+
+# 训练 / 评估 / 导出
+ultralytics>=8.3
+onnx>=1.16
+onnxruntime>=1.18
+
+# Demo
+gradio>=4.0
+
+# 开发
+pytest>=8.0
+ruff>=0.5

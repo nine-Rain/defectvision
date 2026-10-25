@@ -1,0 +1,45 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+pip-*/
+pytest-of-*/
+pip_*.log
+
+# --- 数据与模型产物（绝对不要提交） ---
+# 图片进 git 会让仓库变成几 GB，别人 clone 一次就跑了。
+data/*
+!data/README.md
+
+runs/
+models/*
+!models/README.md
+
+*.pt
+*.onnx
+*.engine
+*.pth
+*.ckpt
+
+# --- 结果只保留汇总，不保留大文件 ---
+results/*
+!results/README.md
+!results/*.md
+!results/*.json
+
+# --- Demo 上传的临时文件 ---
+gradio_cached_examples/
+flagged/
+
+# --- 编辑器 / 系统 ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

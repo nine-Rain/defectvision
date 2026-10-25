@@ -1,0 +1,11 @@
+# 合成演示数据集：先用来跑通流水线，跑完就可以删。
+# 由 python scripts/make_demo_dataset.py 生成。
+path: data/demo
+
+train: images/train
+val: images/val
+
+names:
+  0: scratch
+  1: dent
+  2: stain

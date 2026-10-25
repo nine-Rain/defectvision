@@ -1,0 +1,8 @@
+# 统一换行符，避免 Windows 提交、Linux CI 校验时整仓库变成"全部修改"
+* text=auto eol=lf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.pt binary
+*.onnx binary

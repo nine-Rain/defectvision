@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# 数据集配置（Ultralytics 格式）
+#
+# 目录结构约定：
+#   data/dataset/
+#   ├── images/
+#   │   ├── train/*.jpg
+#   │   ├── val/*.jpg
+#   │   └── test/*.jpg      （可选）
+#   └── labels/
+#       ├── train/*.txt     （与图片同名，YOLO 格式）
+#       ├── val/*.txt
+#       └── test/*.txt
+#
+# 每行一个框：class_id cx cy w h（全部归一化到 0~1）
+# 分割任务则每行是 class_id x1 y1 x2 y2 ... 的多边形点
+# ---------------------------------------------------------------------------
+
+# path 可以是绝对路径，也可以是相对仓库根目录的路径
+path: data/dataset
+
+train: images/train
+val: images/val
+test: images/test
+
+# 类别表。改这里 = 改你的业务，跑 prepare.py stats 会按它校验标签。
+names:
+  0: scratch   # 划痕
+  1: dent      # 凹陷
+  2: stain     # 污渍
