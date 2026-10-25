@@ -1,0 +1,20 @@
+{
+  "tag": "cbam-aug-test",
+  "note": "resnet50+FPN+CBAM，50ep+增强@512，MSDD test",
+  "created_at": "2026-10-26T00:14:12",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\cbam-aug\\best.pt",
+  "size_mb": 158.31,
+  "params": 41419356,
+  "task": "detect",
+  "split": "test",
+  "mAP50-95": 0.29799684882164,
+  "mAP50": 0.574093759059906,
+  "precision": null,
+  "recall": 0.3842158615589142,
+  "raw": {
+    "mAP50-95": 0.29799684882164,
+    "mAP50": 0.574093759059906,
+    "mAP75": 0.25686171650886536,
+    "recall": 0.3842158615589142
+  }
+}

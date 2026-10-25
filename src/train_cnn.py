@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import random
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -85,6 +87,14 @@ def train(args: argparse.Namespace) -> int:
     epochs = 1 if args.smoke else args.epochs
     imgsz = 320 if args.smoke else args.imgsz
     name = "smoke-cnn" if args.smoke else args.name
+
+    # 固定随机种子：数据顺序、权重初始化、增强都受它影响。
+    # 不固定的话两次"同样的实验"能差 0.02 mAP，消融结论就没法信了。
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    print(f"seed={args.seed}")
 
     print(f"数据集: {root}  ({len(names)} 类)")
     print(f"设备: {device}   epochs={epochs}  imgsz={imgsz}  batch={args.batch}")
@@ -211,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch", type=int, default=4)
     parser.add_argument("--lr", type=float, default=0.005)
     parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--name", default="cnn-cbam")
     parser.add_argument("--no-amp", dest="amp", action="store_false", default=True)
