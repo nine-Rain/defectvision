@@ -225,6 +225,8 @@ defectvision/
 | 导出 ONNX 后延迟从 2ms 变 14ms，以为量化把模型搞坏了 | 导出有问题 | 发现 `.pt` 跑 GPU、`.onnx` 跑 CPU | 基准必须固定设备，否则结论全是假的 |
 | INT8 比 FP32 还慢一倍（44 vs 21ms） | 量化必然更快 | 同设备复测仍然如此 | 小模型 + CPU 无 VNNI，反量化开销主导；要提速得换 OpenVINO / NCNN |
 | 对比表里混进 `export_*.json`，多出两行 `?` | 表格读错文件 | 看到那几个 json 没有 `tag` 字段 | 导出清单不是评估结果，读表时按 `tag` 过滤 |
+| 本地 `ruff` 全绿，CI 却挂在 lint | 版本不一致 | 在干净 clone 里复现，发现仓库根目录多了 `gradio/` 和 `Ultralytics/` | 目录名与包名只差大小写，ruff 把 `gradio`/`ultralytics` 误判为**本地模块**；把缓存目录移出仓库根目录 |
+| Demo 上传的私人图片被 `git add -A` 提交进公开仓库 | — | `git ls-files` 里出现 `gradio/<hash>/微信图片_*.png` | 缓存目录必须在 `.gitignore` 里；提交前先看 `git status`。已用 `filter-branch` 从历史中清除并强推 |
 
 ## 常见问题
 
