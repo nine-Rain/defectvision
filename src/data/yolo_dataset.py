@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 
+import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageOps
 from torch.utils.data import Dataset
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -53,13 +55,17 @@ def read_yolo_labels(label_path: Path, width: int, height: int) -> tuple[torch.T
 
 
 class YoloDetectionDataset(Dataset):
-    def __init__(self, root: Path, split: str, min_side: int | None = None) -> None:
+    def __init__(
+        self, root: Path, split: str, min_side: int | None = None, augment: bool = False
+    ) -> None:
         self.image_dir = root / "images" / split
         self.label_dir = root / "labels" / split
         if not self.image_dir.is_dir():
             raise FileNotFoundError(f"找不到图片目录: {self.image_dir}")
         self.images = sorted(p for p in self.image_dir.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
         self.min_side = min_side
+        # 增强只给训练集开；验证集必须保持原样，否则指标不可比
+        self.augment = augment
 
     def __len__(self) -> int:
         return len(self.images)
@@ -70,9 +76,26 @@ class YoloDetectionDataset(Dataset):
         if self.min_side and min(image.size) < self.min_side:
             scale = self.min_side / min(image.size)
             image = image.resize((int(image.width * scale), int(image.height * scale)))
-        width, height = image.size
 
+        # 水平翻转 + 轻度色彩扰动。缺陷大多没有方向性，翻转是安全的；
+        # 不做旋转/裁剪，避免把细长划痕切碎后引入错误标签。
+        flipped = False
+        if self.augment:
+            if random.random() < 0.5:
+                image = ImageOps.mirror(image)
+                flipped = True
+            if random.random() < 0.4:
+                image = ImageEnhance.Brightness(image).enhance(random.uniform(0.8, 1.2))
+            if random.random() < 0.4:
+                image = ImageEnhance.Contrast(image).enhance(random.uniform(0.8, 1.2))
+
+        width, height = image.size
         boxes, labels = read_yolo_labels(self.label_dir / f"{path.stem}.txt", width, height)
+        if flipped and boxes.numel():
+            x0, x1 = boxes[:, 0].clone(), boxes[:, 2].clone()
+            boxes[:, 0] = width - x1
+            boxes[:, 2] = width - x0
+
         target = {
             "boxes": boxes,
             "labels": labels,
@@ -81,7 +104,7 @@ class YoloDetectionDataset(Dataset):
             "iscrowd": torch.zeros((boxes.shape[0],), dtype=torch.int64),
         }
         image_tensor = torch.from_numpy(
-            __import__("numpy").asarray(image, dtype="float32") / 255.0
+            np.asarray(image, dtype="float32") / 255.0
         ).permute(2, 0, 1).contiguous()
         return image_tensor, target
 

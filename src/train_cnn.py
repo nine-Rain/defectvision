@@ -30,8 +30,10 @@ from src.evaluate import save_result, write_table
 from src.models.detector import build_detector, count_parameters
 
 
-def build_loader(root: Path, split: str, batch: int, workers: int, shuffle: bool) -> DataLoader:
-    dataset = YoloDetectionDataset(root, split)
+def build_loader(
+    root: Path, split: str, batch: int, workers: int, shuffle: bool, augment: bool = False
+) -> DataLoader:
+    dataset = YoloDetectionDataset(root, split, augment=augment)
     if len(dataset) == 0:
         raise SystemExit(f"{split} 集是空的: {root / 'images' / split}")
     return DataLoader(
@@ -88,7 +90,9 @@ def train(args: argparse.Namespace) -> int:
     print(f"设备: {device}   epochs={epochs}  imgsz={imgsz}  batch={args.batch}")
     print(f"骨干: {args.backbone}   FPN: 是   CBAM: {'是' if args.cbam else '否'}")
 
-    train_loader = build_loader(root, "train", args.batch, args.workers, shuffle=True)
+    train_loader = build_loader(
+        root, "train", args.batch, args.workers, shuffle=True, augment=args.augment
+    )
     val_loader = build_loader(root, "val", args.batch, args.workers, shuffle=False)
 
     model = build_detector(
@@ -210,6 +214,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--name", default="cnn-cbam")
     parser.add_argument("--no-amp", dest="amp", action="store_false", default=True)
+    parser.add_argument(
+        "--augment",
+        action="store_true",
+        help="训练集开水平翻转 + 色彩扰动（YOLO 路线一直开着，CNN 路线默认关以便复现旧结果）",
+    )
     parser.add_argument("--smoke", action="store_true", help="1 epoch + 320 尺寸")
     args = parser.parse_args(argv)
     return train(args)
