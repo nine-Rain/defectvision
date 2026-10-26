@@ -187,6 +187,24 @@ def test_force_mask_falls_back_to_box_without_masks():
     assert result.area_basis == "box"
 
 
+def test_confidence_weighting_shrinks_area():
+    """加权口径下，0.5 分的框只贡献一半面积。
+
+    注意这是语义单测——实验证明加权对误杀率没有帮助（见 README），所以默认关闭。
+    """
+    box = square(100)
+    binary_cfg = {**load_grading_config(), "area_weighting": "binary"}
+    weighted_cfg = {**load_grading_config(), "area_weighting": "confidence"}
+
+    low_conf = Detection(cls_id=0, cls_name="stain", confidence=0.5, box=box)
+    binary = grade([low_conf], IMAGE_SIZE, config=binary_cfg)
+    weighted = grade([low_conf], IMAGE_SIZE, config=weighted_cfg)
+
+    assert weighted.area_weighted is True
+    assert binary.area_weighted is False
+    assert abs(weighted.features["area_ratio"] - binary.features["area_ratio"] * 0.5) < 1e-6
+
+
 
 def test_defect_table_marks_type_baseline_not_final_level():
     """单个缺陷的 severity 只是类型基准，不能等于最终等级。"""

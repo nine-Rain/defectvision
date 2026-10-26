@@ -1,4 +1,4 @@
-"""分级实验：检测精度如何传递到判级准确率。
+﻿"""分级实验：检测精度如何传递到判级准确率。
 
 思路（也是答辩老师说的"很少有人做的量化分级"）：
 
@@ -119,11 +119,19 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="判级前做 NMS 的 IoU 阈值（0 表示不做）。用于验证'重复检出撑大面积'的假设",
     )
+    parser.add_argument(
+        "--area-weighting",
+        choices=["config", "confidence", "binary"],
+        default="config",
+        help="面积是否按置信度加权；config 表示用 grading.yaml 的设置",
+    )
     args = parser.parse_args(argv)
 
     dataset_cfg = load_dataset(args.dataset)
     root = repo_path(dataset_cfg["path"])
     grading_cfg = load_grading_config()
+    if args.area_weighting != "config":
+        grading_cfg["area_weighting"] = args.area_weighting
     names = dataset_cfg["names"]
     payload = {"config": grading_cfg, "names_lookup": names}
 
@@ -155,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
         result = detector.predict(image, conf=args.conf)
         if args.nms_iou > 0:
             result.detections = apply_nms(result.detections, args.nms_iou)
-        predicted = grade(result.detections, result.image_size).level
+        predicted = grade(result.detections, result.image_size, payload["config"]).level
         confusion[truth, predicted] += 1
         rows.append({"image": path.name, "truth": truth, "predicted": predicted})
 

@@ -43,6 +43,8 @@ class GradeResult:
     # 面积实际用了哪种口径："mask"（掩码像素）或 "box"（框并集）。
     # 两者的数值不可比，必须显示出来，否则用户会拿不同口径的百分比互相比较。
     area_basis: str = "box"
+    # 面积是否按置信度加权（False 时等价于二值并集）
+    area_weighted: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -51,6 +53,7 @@ class GradeResult:
             "action": self.action,
             "score": round(self.score, 2),
             "area_basis": self.area_basis,
+            "area_weighted": self.area_weighted,
             "features": {k: round(v, 4) for k, v in self.features.items()},
             "criteria": self.criteria,
             "reasons": self.reasons,
@@ -72,39 +75,44 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
 
 
-def _union_area_ratio(boxes: list[tuple[float, float, float, float]], width: int, height: int) -> float:
-    """把框画到布尔掩码上求并集，避免重叠框把面积重复计入。"""
-    mask = np.zeros((height, width), dtype=bool)
-    for x0, y0, x1, y1 in boxes:
+def _coverage_ratio(
+    detections: list[Detection],
+    width: int,
+    height: int,
+    use_mask: bool,
+    weight_by_confidence: bool,
+) -> float:
+    """计算缺陷覆盖面积占比。
+
+    每个像素取"覆盖它的最高置信度"作为权重，再对整张图求平均：
+    - 不加权时（权重恒为 1）等价于"框/掩码的并集"，重叠不会重复计数；
+    - 加权时，0.3 分的框只贡献 0.3 的面积，误检对判级的冲击被削弱。
+    这比"面积相加"更合理：同一处缺陷被检出两次，不会让面积翻倍。
+    """
+    canvas = np.zeros((height, width), dtype=np.float32)
+    for detection in detections:
+        weight = float(detection.confidence) if weight_by_confidence else 1.0
+        weight = _clamp(weight)
+
+        if use_mask and detection.mask is not None:
+            mask = np.asarray(detection.mask)
+            if mask.shape != (height, width):
+                from PIL import Image
+
+                mask = np.asarray(
+                    Image.fromarray(mask.astype(np.uint8)).resize((width, height), Image.NEAREST)
+                )
+            canvas = np.maximum(canvas, mask.astype(np.float32) * weight)
+            continue
+
+        x0, y0, x1, y1 = detection.box
         left = int(_clamp(x0, 0, width - 1))
         top = int(_clamp(y0, 0, height - 1))
         right = int(_clamp(x1, left + 1, width))
         bottom = int(_clamp(y1, top + 1, height))
-        mask[top:bottom, left:right] = True
-    return float(mask.mean())
+        canvas[top:bottom, left:right] = np.maximum(canvas[top:bottom, left:right], weight)
 
-
-def _mask_area_ratio(detections: list[Detection], width: int, height: int) -> float | None:
-    """有掩码时按像素算真实覆盖面积——框会把"缺陷+大片背景"一起算进去，
-    分割掩码不会，这是降低面积虚高的关键。"""
-    masks: list[np.ndarray] = []
-    for detection in detections:
-        if detection.mask is None:
-            return None  # 混着来就没法统一口径，退回框面积
-        mask = np.asarray(detection.mask)
-        if mask.shape != (height, width):
-            from PIL import Image
-
-            mask = np.asarray(
-                Image.fromarray(mask.astype(np.uint8)).resize((width, height), Image.NEAREST)
-            )
-        masks.append(mask.astype(bool))
-    if not masks:
-        return None
-    union = np.zeros((height, width), dtype=bool)
-    for mask in masks:
-        union |= mask
-    return float(union.mean())
+    return float(canvas.sum()) / (width * height)
 
 
 def _box_gap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
@@ -168,11 +176,12 @@ def grade(
     # 面积口径：mask 用掩码像素、box 用框并集、auto 有掩码就用掩码。
     # 框会把"缺陷+背景"一起算进去，模型框越松面积越虚高——换分辨率就会失效。
     area_source = str(cfg.get("area_source", "auto")).lower()
-    mask_ratio = _mask_area_ratio(kept, width, height) if area_source != "box" else None
-    if mask_ratio is not None:
-        area_ratio, area_basis = mask_ratio, "mask"
-    else:
-        area_ratio, area_basis = _union_area_ratio(boxes, width, height), "box"
+    has_masks = bool(kept) and all(d.mask is not None for d in kept)
+    use_mask = has_masks if area_source == "auto" else (area_source == "mask" and has_masks)
+    weight_by_confidence = str(cfg.get("area_weighting", "confidence")).lower() == "confidence"
+
+    area_ratio = _coverage_ratio(kept, width, height, use_mask, weight_by_confidence)
+    area_basis = "mask" if use_mask else "box"
     count = len(kept)
     severity_max = max(severity_map.get(d.cls_name, 2) for d in kept)
 
@@ -272,6 +281,7 @@ def grade(
         defects=defects,
         criteria=dict(candidates),
         area_basis=area_basis,
+        area_weighted=weight_by_confidence,
     )
 
 
@@ -300,7 +310,8 @@ def format_report(
         "量化特征:",
         f"  缺陷数量      {int(result.features.get('count', 0))}",
         f"  覆盖面积占比  {result.features.get('area_ratio', 0) * 100:.2f}%"
-        f"（{'掩码像素' if result.area_basis == 'mask' else '检测框'}口径）",
+        f"（{'掩码像素' if result.area_basis == 'mask' else '检测框'}口径"
+        f"{'，按置信度加权' if result.area_weighted else ''}）",
         f"  最高严重度    {int(result.features.get('severity', 0))} / 4（类型基准，不直接决定等级）",
         f"  分布覆盖      {result.features.get('spread', 0) * 100:.1f}%",
     ]

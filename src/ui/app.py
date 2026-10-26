@@ -292,6 +292,7 @@ class MainWindow(QMainWindow):
         basis = "掩码" if verdict.area_basis == "mask" else "检测框"
         self.score_label.setText(
             f"综合得分 {verdict.score:.1f} / 100（仅供参考）　｜　面积口径：{basis}"
+            f"{'（置信度加权）' if verdict.area_weighted else ''}"
         )
 
         if verdict.criteria:
