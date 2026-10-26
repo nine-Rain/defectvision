@@ -8,6 +8,7 @@
 | onnx-fp32 | 0.3759 | 0.5607 | 0.6990 | 0.5227 | 10.12 | ONNX fp32 |
 | onnx-int8 | 0.3759 | 0.5602 | 0.6673 | 0.5321 | 2.88 | ONNX INT8 |
 | seg-test | 0.3426 | 0.5802 | 0.7397 | 0.5200 | 5.75 | yolo11n-seg 50ep @512，test（掩码） |
+| yolo11n-hn-test | 0.3357 | 0.5296 | 0.6250 | 0.5259 | 5.24 | yolo11n 50ep @512 + 711 难负样本，test |
 | neu-cnn-test | 0.2990 | 0.6668 | — | 0.4787 | 158.31 | resnet50+FPN+CBAM，20ep@320，NEU test |
 | cbam-aug-test | 0.2980 | 0.5741 | — | 0.3842 | 158.31 | resnet50+FPN+CBAM，50ep+增强@512，MSDD test |
 | nocbam-aug-test | 0.2749 | 0.5158 | — | 0.3594 | 158.15 | resnet50+FPN，50ep+增强@512，MSDD test |

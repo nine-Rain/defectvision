@@ -1,0 +1,23 @@
+{
+  "tag": "yolo11n-hn-test",
+  "note": "yolo11n 50ep @512 + 711 难负样本，test",
+  "created_at": "2026-10-26T21:11:45",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\yolo11n-hn\\weights\\best.pt",
+  "size_mb": 5.24,
+  "params": 2606098,
+  "task": "detect",
+  "split": "test",
+  "raw": {
+    "metrics/precision(B)": 0.6250225257413596,
+    "metrics/recall(B)": 0.5258795496244981,
+    "metrics/mAP50(B)": 0.5295873422613034,
+    "metrics/mAP50-95(B)": 0.33567029201585213,
+    "fitness": 0.33567029201585213
+  },
+  "mAP50-95": 0.33567029201585213,
+  "mAP50": 0.5295873422613034,
+  "precision": 0.6250225257413596,
+  "recall": 0.5258795496244981,
+  "box_mAP50": null,
+  "inference_ms": 2.04000466663274
+}
