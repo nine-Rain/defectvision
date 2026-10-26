@@ -1,5 +1,6 @@
 | 方案 | mAP50-95 | mAP50 | Precision | Recall | 体积 (MB) | 备注 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| rtdetr-test | 0.4272 | 0.6408 | 0.7787 | 0.5640 | 63.14 | RT-DETR-l 30ep @512，test |
 | neu-yolo-test | 0.4041 | 0.7492 | 0.6967 | 0.6876 | 5.22 | yolo11n 50ep @320，NEU test |
 | yolo11n-640-test | 0.3873 | 0.5900 | 0.6612 | 0.5592 | 5.26 | yolo11n 50ep @640，test |
 | baseline-test | 0.3842 | 0.5590 | 0.6680 | 0.5297 | 5.24 | yolo11n 50ep @512，test |

@@ -1,0 +1,23 @@
+{
+  "tag": "rtdetr-test",
+  "note": "RT-DETR-l 30ep @512，test",
+  "created_at": "2026-10-26T13:29:36",
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\rtdetr-l\\weights\\best.pt",
+  "size_mb": 63.14,
+  "params": 32818406,
+  "task": "detect",
+  "split": "test",
+  "raw": {
+    "metrics/precision(B)": 0.7787253951240881,
+    "metrics/recall(B)": 0.5639734271498101,
+    "metrics/mAP50(B)": 0.6407934781554926,
+    "metrics/mAP50-95(B)": 0.42724102623983484,
+    "fitness": 0.42724102623983484
+  },
+  "mAP50-95": 0.42724102623983484,
+  "mAP50": 0.6407934781554926,
+  "precision": 0.7787253951240881,
+  "recall": 0.5639734271498101,
+  "box_mAP50": null,
+  "inference_ms": 17.657381333331916
+}

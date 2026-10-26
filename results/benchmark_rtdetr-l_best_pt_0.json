@@ -1,0 +1,15 @@
+{
+  "weights": "D:\\deep seek-harness\\projects\\defectvision\\runs\\rtdetr-l\\weights\\best.pt",
+  "backend": "pt",
+  "imgsz": 512,
+  "runs": 40,
+  "size_mb": 63.14,
+  "params": 32818406,
+  "mean_ms": 22.85,
+  "p50_ms": 22.5,
+  "p95_ms": 26.95,
+  "min_ms": 18.53,
+  "max_ms": 28.53,
+  "fps": 43.8,
+  "device": "0"
+}
