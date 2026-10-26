@@ -30,6 +30,23 @@ LEVELS = [0, 1, 2, 3, 4]
 LEVEL_LABELS = {0: "合格", 1: "I", 2: "II", 3: "III", 4: "IV"}
 
 
+def apply_nms(detections: list[Detection], iou: float) -> list[Detection]:
+    """判级前的后处理：合并高度重叠的框。
+
+    动机：判级看的是"缺陷覆盖面积"，同一个缺陷被重复检出几次，
+    并集面积就虚高，等级被推高。RT-DETR 这类无 NMS 的模型尤其明显。
+    """
+    if len(detections) < 2:
+        return detections
+    import torch
+    from torchvision.ops import nms
+
+    boxes = torch.tensor([d.box for d in detections], dtype=torch.float32)
+    scores = torch.tensor([d.confidence for d in detections], dtype=torch.float32)
+    keep = nms(boxes, scores, iou).tolist()
+    return [detections[index] for index in keep]
+
+
 def label_to_detections(
     label_path: Path, width: int, height: int, names: dict[int, str], with_mask: bool = True
 ) -> list[Detection]:
@@ -96,6 +113,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--conf", type=float, default=0.25)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--out", default="results")
+    parser.add_argument(
+        "--nms-iou",
+        type=float,
+        default=0.0,
+        help="判级前做 NMS 的 IoU 阈值（0 表示不做）。用于验证'重复检出撑大面积'的假设",
+    )
     args = parser.parse_args(argv)
 
     dataset_cfg = load_dataset(args.dataset)
@@ -130,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
             path, label_dir / f"{path.stem}.txt", (width, height), payload, with_mask
         )
         result = detector.predict(image, conf=args.conf)
+        if args.nms_iou > 0:
+            result.detections = apply_nms(result.detections, args.nms_iou)
         predicted = grade(result.detections, result.image_size).level
         confusion[truth, predicted] += 1
         rows.append({"image": path.name, "truth": truth, "predicted": predicted})
