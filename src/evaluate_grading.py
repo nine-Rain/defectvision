@@ -1,4 +1,4 @@
-﻿"""分级实验：检测精度如何传递到判级准确率。
+"""分级实验：检测精度如何传递到判级准确率。
 
 思路（也是答辩老师说的"很少有人做的量化分级"）：
 
@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -133,7 +134,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.area_weighting != "config":
         grading_cfg["area_weighting"] = args.area_weighting
     names = dataset_cfg["names"]
-    payload = {"config": grading_cfg, "names_lookup": names}
+
+    # 参考等级必须用"未过滤"的配置：过滤规则是对模型输出的后处理，
+    # 如果连标注也过滤，等于把标准改了，实验就失去意义。
+    ref_cfg = copy.deepcopy(grading_cfg)
+    ref_cfg["criteria"]["max_det_area_ratio"] = 0
+    pred_cfg = copy.deepcopy(grading_cfg)
+    payload = {"config": ref_cfg, "names_lookup": names}
 
     # 先探一下模型输出有没有掩码，决定参考等级的算法口径（必须一致）
     from PIL import Image
@@ -163,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         result = detector.predict(image, conf=args.conf)
         if args.nms_iou > 0:
             result.detections = apply_nms(result.detections, args.nms_iou)
-        predicted = grade(result.detections, result.image_size, payload["config"]).level
+        predicted = grade(result.detections, result.image_size, pred_cfg).level
         confusion[truth, predicted] += 1
         rows.append({"image": path.name, "truth": truth, "predicted": predicted})
 

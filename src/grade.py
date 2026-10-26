@@ -160,14 +160,37 @@ def grade(
     diagonal = math.hypot(width, height)
     kept = [d for d in detections if d.confidence >= conf_floor]
 
+    # 剔除"整体框"：把整个零件框成一个缺陷的输出，面积必然接近 100%，
+    # 会把等级直接顶到 IV。人工复核发现这是误杀的主要来源（真实缺陷通常另有小框）。
+    # 阈值可配，设 0 表示不过滤。
+    max_area_ratio = float(criteria.get("max_det_area_ratio", 0.0))
+    excluded = 0
+    if max_area_ratio > 0:
+        plausible = []
+        for detection in kept:
+            if detection.area / float(width * height) > max_area_ratio:
+                excluded += 1
+            else:
+                plausible.append(detection)
+        kept = plausible
+
     if not kept:
+        reason = "未检出缺陷，判定合格"
+        if excluded:
+            reason = f"剔除了 {excluded} 个覆盖整体的框后，无有效缺陷，判定合格"
         return GradeResult(
             level=0,
             level_name="合格（未检出缺陷）",
             action="直接放行",
             score=0.0,
-            features={"area_ratio": 0.0, "count": 0.0, "severity": 0.0, "spread": 0.0},
-            reasons=["未检出缺陷，判定合格"],
+            features={
+                "area_ratio": 0.0,
+                "count": 0.0,
+                "severity": 0.0,
+                "spread": 0.0,
+                "excluded_boxes": float(excluded),
+            },
+            reasons=[reason],
             defects=[],
         )
 
@@ -270,6 +293,7 @@ def grade(
         "spread": spread,
         "crack_max_length": max(crack_lengths) if crack_lengths else 0.0,
         "clustered": 1.0 if clustered else 0.0,
+        "excluded_boxes": float(excluded),
     }
     return GradeResult(
         level=final_level,
