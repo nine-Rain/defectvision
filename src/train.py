@@ -90,13 +90,22 @@ def run(args: argparse.Namespace) -> int:
         print("\n--dry-run：以上参数未执行。")
         return 0
 
-    from ultralytics import YOLO  # 延迟导入，--dry-run 时不需要装 ultralytics
+    # 延迟导入，--dry-run 时不需要装 ultralytics
+    from ultralytics import YOLO
+
+    def build_model(name: str):
+        """RT-DETR 要用专门的类加载，YOLO 包装类认不出它的权重。"""
+        if "rtdetr" in name.lower():
+            from ultralytics import RTDETR
+
+            return RTDETR(name)
+        return YOLO(name)
 
     if args.resume:
-        model = YOLO(str(repo_path(args.resume)))
+        model = build_model(str(repo_path(args.resume)))
         results = model.train(resume=True)
     else:
-        model = YOLO(cfg.model)
+        model = build_model(cfg.model)
         results = model.train(**kwargs)
 
     save_dir = Path(getattr(model.trainer, "save_dir", repo_path(cfg.project) / cfg.name))
